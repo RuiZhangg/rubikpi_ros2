@@ -24,7 +24,7 @@ from std_msgs.msg import Float32MultiArray
 TOPIC = "/motor_commands"
 PUBLISH_HZ = 25.0
 MAX_COMMAND = 0.5  # Matches clipping in provided motor_control.py.
-MAX_TEST_SECONDS = 5.0  # Initial supervised calibration only.
+MAX_TEST_SECONDS = 10.0  # Initial supervised calibration only.
 
 
 def read_args():

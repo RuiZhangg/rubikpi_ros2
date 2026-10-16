@@ -2,7 +2,7 @@
 
 **Student:** Rui Zhang
 **Due:** October 16, 2026  
-**Report status:** Draft — replace all `[TODO]` fields with real experimental results before submitting.  
+**Report status:** Draft — forward translation and motor-balance experiments recorded (30 trials). Rotation, full-route results, and video still pending.  
 **Video:** [TODO: unlisted YouTube URL]
 
 > **Submission:** This Markdown is the editable report source and the project README. Export a final `report.pdf` from it and include both the PDF and the runnable `robot_control` package in the ZIP.
@@ -16,9 +16,9 @@ The goal is to traverse the assigned sequence of planar poses \((x,y,\theta)\) a
 - **Coordinate convention:** world +x right/forward at the starting pose, +y 90° counterclockwise, yaw positive CCW, yaw angles in radians.
 - **Starting pose assumption:** manually place robot center at `(0,0)`, yaw `0` before every full run.
 - **Physical scale:** 1 coordinate unit in the provided file corresponds to **0.8 m**, following instructor's permission for a scaled workspace. 
-- **Test surface:** dorm's low carpet, due to best accessibility
+- **Test surface:** dorm low-pile carpet (used in all reported calibration trials).
 - **Usable test area:** about 1.6 m × 1.6 m, with robot clearance already considered.
-- **Measurement method:** Rolling ruler with set square rulers and protractor
+- **Measurement method:** Forward experiments: Straight tape measure laid alongside the robot and a box (kept below cable height) used as a repeatable reference marker. A set square was used to measure the rightward offset after motion. For each trial, the longer recorded “straight” value was the hypotenuse from start to end, and the recorded lateral value was the perpendicular leg, signed according to whether the endpoint was left or right of the initial forward axis. The unrecorded forward-axis leg and displacement bearing were computed using right-triangle geometry. The final orientation of the robot body was not independently measured in these forward trials. Photos of the measurement arrangement were recorded.
 
 ### Input waypoints
 
@@ -52,7 +52,7 @@ For planar pose \((x,y,\theta)\):
 
 The rover uses four-wheel skid steering, so the ideal no-slip differential-drive equations are approximations. **The ROS motor inputs are normalized command values, not measured wheel speeds or meters/second.** Instead of assuming a known wheel radius and track width, our implemented controller uses an **empirical command-to-motion model** for a selected set of constant inputs:
 
-- Forward command `([TODO L], [TODO R])`: \(d\approx \hat v_f t\), with \(\hat v_f\) in m/s.
+- Forward command **provisional** `(+0.130, +0.200)`: \(x\approx \hat v_f t\), where \(x\) is displacement along the initial forward axis and \(\hat v_f\) is only an empirical mean rate for the **tested 4.0 s command**. A 4.0 s command produced 0.79797 m mean forward displacement (2 trials); this is not yet a speed model validated over multiple durations.
 - Left in-place turn `([TODO L], [TODO R])`: \(\Delta\theta\approx\hat\omega_L t\), \(\hat\omega_L>0\).
 - Right in-place turn `([TODO L], [TODO R])`: \(\Delta\theta\approx\hat\omega_R t\), \(\hat\omega_R<0\).
 
@@ -63,16 +63,67 @@ These approximations assume reasonably repeatable motor response, floor friction
 ## 3. Calibration method and results — 4-point rubric category
 
 **Procedure:** Mark a reference origin, axis, and headings on the floor. Start each trial from the same pose. Send a motor command at 25 Hz for a specified interval, then publish repeated zero commands. After the robot stops, measure actual displacement and/or angular change. Store all trials in `calibration/trials.csv` (including command values, duration, measured result, and notes).
+### Translation calibration — equal-command baseline (15 trials)
 
-### Translation calibration
+**Fixed variables:** motor command `[+0.200,+0.200]`, same low-pile carpet and measurement arrangement. **Varied variable:** command duration (1.0, 1.5, and 3.0 s), five independent starts per duration. Full raw measurements and derived values are in `calibration/trials.csv`.
 
-| Command [L,R] | Duration (s) | Trial distance (m) | Heading drift (deg) | Notes |
-|---|---:|---:|---:|---|
-| `[0.20,0.20]` | 1.0 | [TODO] | [TODO] | Trial 3 |
-| `[0.20,0.20]` | 1.5 | [TODO] | [TODO] | Trial 4 |
-| `[0.20,0.20]` | 3.0 | [TODO] | [TODO] | Check longer-motion behavior |
+**Measurement geometry and conventions:** Let `h` be the measured hypotenuse from the start reference to the endpoint and `r` the measured nonnegative lateral offset. Set signed `y = -r` for right deviation and `y = +r` for left deviation. The missing forward-axis component and net displacement bearing are:
 
-Estimate an effective forward velocity from the measured \(d_i,t_i\) values, e.g. \(\hat v_f\approx\sum_i d_i/\sum_i t_i\) as a simple initial model. Discuss whether a through-origin proportional model is justified. **Selected \(\hat v_f\): [TODO] m/s.**
+\[
+ x=\sqrt{h^2-y^2},\qquad \alpha=\operatorname{atan2}(y,x).
+\]
+
+For *all* `motion=forward` rows, `distance_m` contains the **forward-axis component `x`**, while `angle_rad` contains the **net displacement bearing `α`**, *not* the robot's final yaw. The hypotenuse `h` is the start-to-end displacement magnitude, not the integrated distance traveled along a curved trajectory. The original hypotenuse and signed lateral measurements remain in the CSV `notes`.
+
+| Command `[L,R]` | Duration | Trials | Mean forward `x` (m) | Sample SD `x` (m) | Mean signed lateral `y` (cm) | Mean displacement bearing | Mean `x/t` (m/s) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `[0.200,0.200]` | 1.0 s | 5 | 0.24654 | 0.00808 | −1.12 | −2.60° | 0.24654 |
+| `[0.200,0.200]` | 1.5 s | 5 | 0.38504 | 0.00992 | −2.08 | −3.10° | 0.25669 |
+| `[0.200,0.200]` | 3.0 s | 5 | 0.78429 | 0.00950 | −7.82 | −5.69° | 0.26143 |
+
+The increasing measured rightward offset is consistent with systematic rightward curvature. The final *body* heading was not directly measured, so the displacement bearing cannot be used as a yaw measurement.
+
+**Initial timing model for the baseline command**, estimated using linear least squares over the 15 trials (1.0–3.0 s):
+
+\[
+ \hat x_{[0.2,0.2]}(t)=0.26825t-0.01983\quad \text{m},\qquad 1\leq t\leq 3\ \text{s}.
+\]
+
+The intercept is an empirical correction, not proof of a specific physical dead time. This baseline timing model **must not be reused** for the corrected left/right command pair.
+
+### Straightness / left-command sweep — completed (15 additional trials)
+
+**What varied:** Left normalized motor command `L` in the range `0.080`–`0.180`. **What stayed fixed:** Right command `R=+0.200`, carpet, measurement procedure; each of the 3.0 s and 4.0 s subsets used a fixed duration. A separate 6.0 s test was conducted for `L=0.100`. The initial survey used one trial per setting; the final 4.0 s candidates were repeated. Consequently, the observations are strongest for the repeated 4.0 s settings, and the single-trial survey is exploratory.
+
+**Raw trial-level measurements:** 15 additional rows `F4.01`–`F4.15` have been appended to `calibration/trials.csv`. Signs in the table below follow the coordinate convention: negative is rightward; positive is leftward.
+
+| Left `L` | Right `R` | Duration | n | Mean forward `x` (cm) | Mean signed lateral `y` (cm) | Mean displacement bearing (deg) |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0.180 | 0.200 | 3.0 s | 1 | 74.27 | −5.80 | −4.47 |
+| 0.160 | 0.200 | 3.0 s | 1 | 69.37 | −4.30 | −3.55 |
+| 0.140 | 0.200 | 3.0 s | 1 | 64.68 | −4.00 | −3.54 |
+| 0.120 | 0.200 | 3.0 s | 1 | 58.65 | −2.30 | −2.25 |
+| 0.100 | 0.200 | 3.0 s | 1 | 49.88 | −1.30 | −1.49 |
+| 0.095 | 0.200 | 3.0 s | 1 | 46.70 | +0.10 | +0.12 |
+| 0.090 | 0.200 | 3.0 s | 1 | 45.20 | +0.20 | +0.25 |
+| 0.080 | 0.200 | 3.0 s | 1 | 41.39 | +0.70 | +0.97 |
+| 0.100 | 0.200 | 6.0 s | 1 | 98.43 | +5.80 | +3.37 |
+| 0.140 | 0.200 | 4.0 s | 1 | 83.39 | −1.00 | −0.69 |
+| 0.135 | 0.200 | 4.0 s | 3 | **80.56** | **−0.60** | **−0.43** |
+| 0.130 | 0.200 | 4.0 s | 2 | **79.80** | **−0.65** | **−0.47** |
+
+**Interpretation and selection:** Reducing the left command substantially reduced rightward drift, but also lowered forward travel speed. In the 3.0 s exploratory subset, an offset sign change occurred between `L=0.100` (1.3 cm right) and `L=0.095` (0.1 cm left); however, those commands covered only ~0.47–0.50 m. **Do not conclude that `L=0.095` is best for an 0.8 m segment.** The 6.0 s test at `L=0.100` ended 5.8 cm to the *left*, illustrating that lateral error also depends on commanded duration and/or distance.
+
+For the target **0.8 m waypoint spacing**, the 4.0 s experiments are more directly relevant:
+
+- `[+0.135,+0.200]` (n=3): 0.80563 m mean forward-axis displacement, 0.60 cm mean **rightward** offset; individual offsets ranged from 0.1 cm left to 1.1 cm right.
+- `[+0.130,+0.200]` (n=2): 0.79797 m mean forward-axis displacement, 0.65 cm mean **rightward** offset; individual offsets were 0.4 and 0.9 cm right.
+
+**Provisional choice for 0.8 m forward legs:** `[L,R]=[+0.130,+0.200]` for **4.0 s**, because the observed mean forward displacement is within ~0.2 cm of 0.8 m. The `[+0.135,+0.200]` setting is also defensible and has an extra repeat; the two configurations have essentially indistinguishable mean lateral offsets at this measurement precision. The 4-second effective mean rate for the provisional choice is approximately **0.19949 m/s**; this is **not yet validated** as a constant-speed model for other durations or for 1.131 m diagonal segments. Confirming longer forward movements or the timing relationship remains a separate task.
+
+**Comparison on approximately 0.8 m moves:** the original equal-command 3.0 s baseline gave 0.78429 m forward displacement and 7.82 cm rightward offset (five trials); the selected 4.0 s correction gave 0.79797 m and 0.65 cm rightward offset (two trials). This is a useful demonstration of reduced lateral offset over similar distances, **not** a same-duration comparison or proof of a universally superior command ratio.
+
+**Limitations:** Final body yaw was not independently measured. Apparent lateral offsets may reflect curvature, initial alignment, floor effects, and measurement uncertainty. The largest tested long run (6 s) is a single observation. Further full-route evaluation is required before claiming robust accuracy.
 
 ### Rotation calibration
 
@@ -92,13 +143,13 @@ Convert measured angle to radians, then estimate angular velocity with \(\hat\om
 
 | Parameter | Final value | Units / interpretation |
 |---|---|---|
-| Forward motor command | [TODO] | normalized `[L,R]` |
+| Forward motor command | **Provisional `[+0.130,+0.200]`** | normalized `[L,R]`; selected for 0.8 m / 4.0 s |
 | Left motor command | [TODO] | normalized `[L,R]` |
 | Right motor command | [TODO] | normalized `[L,R]` |
-| Forward speed \(\hat v_f\) | [TODO] | m/s |
+| Forward speed \(\hat v_f\) | **Provisional 0.19949** | m/s; mean forward-axis displacement / 4 s, based on 2 repetitions; not yet a multitime fit |
 | Left turn rate \(\hat\omega_L\) | [TODO] | positive rad/s |
 | Right turn rate \(\hat\omega_R\) | [TODO] | negative rad/s |
-| Effective startup time correction, if used | [TODO or not used] | s |
+| Effective startup time correction, if used | **Not yet estimated for corrected command** | s; old 0.2/0.2 model should not be transferred |
 
 ## 4. Waypoint algorithm and software
 

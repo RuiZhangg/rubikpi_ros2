@@ -1,1 +1,31 @@
 trial,motion,left_cmd,right_cmd,duration_s,distance_m,angle_rad,notes
+F1.1,forward,0.20,0.20,1.0,0.255719,-0.046892,measured_hypotenuse_cm=25.6; measured_right_offset_cm=1.2; distance_m=forward_axis_component_sqrt(h^2-r^2); angle_rad=displacement_bearing_NOT_final_robot_yaw; low_carpet
+F1.2,forward,0.20,0.20,1.0,0.252666,-0.051406,measured_hypotenuse_cm=25.3; measured_right_offset_cm=1.3; distance_m=forward_axis_component_sqrt(h^2-r^2); angle_rad=displacement_bearing_NOT_final_robot_yaw; low_carpet
+F1.3,forward,0.20,0.20,1.0,0.246836,-0.036445,measured_hypotenuse_cm=24.7; measured_right_offset_cm=0.9; distance_m=forward_axis_component_sqrt(h^2-r^2); angle_rad=displacement_bearing_NOT_final_robot_yaw; low_carpet
+F1.4,forward,0.20,0.20,1.0,0.235744,-0.046627,measured_hypotenuse_cm=23.6; measured_right_offset_cm=1.1; distance_m=forward_axis_component_sqrt(h^2-r^2); angle_rad=displacement_bearing_NOT_final_robot_yaw; low_carpet
+F1.5,forward,0.20,0.20,1.0,0.241750,-0.045470,measured_hypotenuse_cm=24.2; measured_right_offset_cm=1.1; distance_m=forward_axis_component_sqrt(h^2-r^2); angle_rad=displacement_bearing_NOT_final_robot_yaw; low_carpet
+F2.1,forward,0.20,0.20,1.5,0.381422,-0.055002,measured_hypotenuse_cm=38.2; measured_right_offset_cm=2.1; distance_m=forward_axis_component_sqrt(h^2-r^2); angle_rad=displacement_bearing_NOT_final_robot_yaw; low_carpet
+F2.2,forward,0.20,0.20,1.5,0.395544,-0.047998,measured_hypotenuse_cm=39.6; measured_right_offset_cm=1.9; distance_m=forward_axis_component_sqrt(h^2-r^2); angle_rad=displacement_bearing_NOT_final_robot_yaw; low_carpet
+F2.3,forward,0.20,0.20,1.5,0.385482,-0.051837,measured_hypotenuse_cm=38.6; measured_right_offset_cm=2.0; distance_m=forward_axis_component_sqrt(h^2-r^2); angle_rad=displacement_bearing_NOT_final_robot_yaw; low_carpet
+F2.4,forward,0.20,0.20,1.5,0.370347,-0.059334,measured_hypotenuse_cm=37.1; measured_right_offset_cm=2.2; distance_m=forward_axis_component_sqrt(h^2-r^2); angle_rad=displacement_bearing_NOT_final_robot_yaw; low_carpet
+F2.5,forward,0.20,0.20,1.5,0.392384,-0.056009,measured_hypotenuse_cm=39.3; measured_right_offset_cm=2.2; distance_m=forward_axis_component_sqrt(h^2-r^2); angle_rad=displacement_bearing_NOT_final_robot_yaw; low_carpet
+F3.1,forward,0.20,0.20,3.0,0.787533,-0.106260,measured_hypotenuse_cm=79.2; measured_right_offset_cm=8.4; distance_m=forward_axis_component_sqrt(h^2-r^2); angle_rad=displacement_bearing_NOT_final_robot_yaw; low_carpet
+F3.2,forward,0.20,0.20,3.0,0.793463,-0.094242,measured_hypotenuse_cm=79.7; measured_right_offset_cm=7.5; distance_m=forward_axis_component_sqrt(h^2-r^2); angle_rad=displacement_bearing_NOT_final_robot_yaw; low_carpet
+F3.3,forward,0.20,0.20,3.0,0.788720,-0.091035,measured_hypotenuse_cm=79.2; measured_right_offset_cm=7.2; distance_m=forward_axis_component_sqrt(h^2-r^2); angle_rad=displacement_bearing_NOT_final_robot_yaw; low_carpet
+F3.4,forward,0.20,0.20,3.0,0.768635,-0.093400,measured_hypotenuse_cm=77.2; measured_right_offset_cm=7.2; distance_m=forward_axis_component_sqrt(h^2-r^2); angle_rad=displacement_bearing_NOT_final_robot_yaw; low_carpet
+F3.5,forward,0.20,0.20,3.0,0.783071,-0.111909,measured_hypotenuse_cm=78.8; measured_right_offset_cm=8.8; distance_m=forward_axis_component_sqrt(h^2-r^2); angle_rad=displacement_bearing_NOT_final_robot_yaw; low_carpet
+F4.01,forward,0.180,0.200,3.0,0.742739,-0.077931,h_cm=74.5;y_cm=-5.8;offset=right;angle=bearing_not_body_yaw;carpet;repeat=1
+F4.02,forward,0.160,0.200,3.0,0.693669,-0.061910,h_cm=69.5;y_cm=-4.3;offset=right;angle=bearing_not_body_yaw;carpet;repeat=1
+F4.03,forward,0.140,0.200,3.0,0.646764,-0.061768,h_cm=64.8;y_cm=-4.0;offset=right;angle=bearing_not_body_yaw;carpet;repeat=1
+F4.04,forward,0.120,0.200,3.0,0.586549,-0.039192,h_cm=58.7;y_cm=-2.3;offset=right;angle=bearing_not_body_yaw;carpet;repeat=1
+F4.05,forward,0.100,0.200,3.0,0.498831,-0.026055,h_cm=49.9;y_cm=-1.3;offset=right;angle=bearing_not_body_yaw;carpet;repeat=1
+F4.06,forward,0.080,0.200,3.0,0.413941,0.016909,h_cm=41.4;y_cm=+0.7;offset=left;angle=bearing_not_body_yaw;carpet;repeat=1
+F4.07,forward,0.090,0.200,3.0,0.451996,0.004425,h_cm=45.2;y_cm=+0.2;offset=left;angle=bearing_not_body_yaw;carpet;repeat=1
+F4.08,forward,0.095,0.200,3.0,0.466999,0.002141,h_cm=46.7;y_cm=+0.1;offset=left;angle=bearing_not_body_yaw;carpet;repeat=1
+F4.09,forward,0.100,0.200,6.0,0.984293,0.058858,h_cm=98.6;y_cm=+5.8;offset=left;angle=bearing_not_body_yaw;carpet;repeat=1
+F4.10,forward,0.140,0.200,4.0,0.833940,-0.011991,h_cm=83.4;y_cm=-1.0;offset=right;angle=bearing_not_body_yaw;carpet;repeat=1
+F4.11,forward,0.135,0.200,4.0,0.808999,0.001236,h_cm=80.9;y_cm=+0.1;offset=left;angle=bearing_not_body_yaw;carpet;repeat=1
+F4.12,forward,0.135,0.200,4.0,0.807925,-0.013614,h_cm=80.8;y_cm=-1.1;offset=right;angle=bearing_not_body_yaw;carpet;repeat=2
+F4.13,forward,0.135,0.200,4.0,0.799960,-0.010000,h_cm=80.0;y_cm=-0.8;offset=right;angle=bearing_not_body_yaw;carpet;repeat=3
+F4.14,forward,0.130,0.200,4.0,0.793990,-0.005038,h_cm=79.4;y_cm=-0.4;offset=right;angle=bearing_not_body_yaw;carpet;repeat=1
+F4.15,forward,0.130,0.200,4.0,0.801949,-0.011222,h_cm=80.2;y_cm=-0.9;offset=right;angle=bearing_not_body_yaw;carpet;repeat=2
