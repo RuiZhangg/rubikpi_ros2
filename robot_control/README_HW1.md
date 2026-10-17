@@ -2,7 +2,7 @@
 
 **Student:** Rui Zhang
 **Due:** October 16, 2026  
-**Report status:** Draft — forward translation and motor-balance experiments recorded (30 trials). Rotation, full-route results, and video still pending.  
+**Report status:** Draft — translation/motor-balance (30 trials) and rotation calibration (12 trials) recorded. Large-angle confirmation, full-route results, and video still pending.  
 **Video:** [TODO: unlisted YouTube URL]
 
 > **Submission:** This Markdown is the editable report source and the project README. Export a final `report.pdf` from it and include both the PDF and the runnable `robot_control` package in the ZIP.
@@ -53,8 +53,8 @@ For planar pose \((x,y,\theta)\):
 The rover uses four-wheel skid steering, so the ideal no-slip differential-drive equations are approximations. **The ROS motor inputs are normalized command values, not measured wheel speeds or meters/second.** Instead of assuming a known wheel radius and track width, our implemented controller uses an **empirical command-to-motion model** for a selected set of constant inputs:
 
 - Forward command **provisional** `(+0.130, +0.200)`: \(x\approx \hat v_f t\), where \(x\) is displacement along the initial forward axis and \(\hat v_f\) is only an empirical mean rate for the **tested 4.0 s command**. A 4.0 s command produced 0.79797 m mean forward displacement (2 trials); this is not yet a speed model validated over multiple durations.
-- Left in-place turn `([TODO L], [TODO R])`: \(\Delta\theta\approx\hat\omega_L t\), \(\hat\omega_L>0\).
-- Right in-place turn `([TODO L], [TODO R])`: \(\Delta\theta\approx\hat\omega_R t\), \(\hat\omega_R<0\).
+- Left in-place turn `(-0.500, +0.500)`: signed yaw \(\Delta\theta_L>0\); magnitude characterized below.
+- Right in-place turn `(+0.500, -0.500)`: signed yaw \(\Delta\theta_R<0\); magnitude characterized below.
 
 These approximations assume reasonably repeatable motor response, floor friction, battery condition, and motion intervals. Short motions may show startup delay or acceleration effects; if measurements support it, use an empirical intercept or a duration lookup rather than assuming perfect linearity.
 
@@ -125,30 +125,46 @@ For the target **0.8 m waypoint spacing**, the 4.0 s experiments are more direct
 
 **Limitations:** Final body yaw was not independently measured. Apparent lateral offsets may reflect curvature, initial alignment, floor effects, and measurement uncertainty. The largest tested long run (6 s) is a single observation. Further full-route evaluation is required before claiming robust accuracy.
 
-### Rotation calibration
+### Rotation calibration — short-duration sweep (12 trials)
 
-| Direction | Command [L,R] | Duration (s) | Measured rotation (deg) | Notes |
-|---|---|---:|---:|---|
-| Left | `[-0.50,+0.50]` | 0.2 | [TODO] | Trial 1 |
-| Left | `[-0.50,+0.50]` | 0.3 | [TODO] | Trial 2 |
-| Right | `[+0.50,-0.50]` | 0.2 | [TODO] | Trial 1 |
-| Right | `[+0.50,-0.50]` | 0.3 | [TODO] | Trial 2 |
-| Left | chosen | [TODO] | [TODO] | Predicted 90° confirmation |
-| Right | chosen | [TODO] | [TODO] | Predicted 90° confirmation |
-| Either | chosen | [TODO] | [TODO] | Predicted 180° confirmation |
+**Procedure:** Starting from a fixed marked orientation on the same low-pile carpet, command an in-place left rotation with `[L,R]=[-0.500,+0.500]`, or right rotation with `[+0.500,-0.500]`. Keep command values and publishing rate fixed; vary command duration among 0.2, 0.4 and 0.6 s, with two independent resets/trials per direction and duration. Measure the **actual final body rotation** in degrees using the physical heading reference. Unlike translation trials, this is directly measured body yaw, not the bearing of start-to-end displacement. Center displacement was not measured, so `distance_m` is blank rather than falsely set to zero. Right-turn angles are stored as negative radians in `calibration/trials.csv`.
 
-Convert measured angle to radians, then estimate angular velocity with \(\hat\omega\approx\Delta\theta/t\). **Selected \(\hat\omega_L\): [TODO] rad/s; \(\hat\omega_R\): [TODO] rad/s.** Note whether clockwise and counterclockwise turns differ.
+| Turn | Input `[L,R]` | Duration | Trial rotations (deg, magnitude) | Mean signed rotation | Sample SD (deg) |
+|---|---|---:|---|---:|---:|
+| Left (CCW) | `[-0.500,+0.500]` | 0.2 s | +22, +16 | +19.0° | 4.24 |
+| Left (CCW) | `[-0.500,+0.500]` | 0.4 s | +33, +43 | +38.0° | 7.07 |
+| Left (CCW) | `[-0.500,+0.500]` | 0.6 s | +50, +56 | +53.0° | 4.24 |
+| Right (CW) | `[+0.500,-0.500]` | 0.2 s | −22, −23 | −22.5° | 0.71 |
+| Right (CW) | `[+0.500,-0.500]` | 0.4 s | −48, −37 | −42.5° | 7.78 |
+| Right (CW) | `[+0.500,-0.500]` | 0.6 s | −61, −54 | −57.5° | 4.95 |
+
+**Estimated angular motion model (exploratory):** Fit ordinary least-squares lines using all six measured magnitudes per direction; positive/negative signed yaw is restored afterward:
+
+\[
+ \hat\theta_L(t) \approx (+85.00 t + 2.67)^\circ,
+ \qquad
+ \hat\theta_R(t) \approx -(87.50 t + 5.83)^\circ,
+ \qquad 0.2\le t\le0.6\;\mathrm{s}.
+\]
+
+The fitted slopes are about **+1.484 rad/s** (left) and **−1.527 rad/s** (right). The nonzero intercepts reflect the *empirical line fitting the sampled intervals*, **not a physically meaningful instantaneous jump in orientation**. An alternative through-origin least-squares fit gives mean rates **+1.583 rad/s** (90.71°/s) and **−1.745 rad/s** (100.00°/s), respectively. The fitted rates and predicted durations are not ground-truth wheel velocities. We should **not assume either model remains accurate for 1–2 seconds** until confirmed with new measurements, especially because the sample size is small and the repeated 0.4-second trials varied by 10–11°.
+
+**Initial extrapolated commands for confirmation only:** From the affine fit, a nominal 45° turn would take approximately **0.498 s left / 0.448 s right**; 90° approximately **1.027 s left / 0.962 s right**; 180° approximately **2.086 s left / 1.990 s right**. These are **untested predictions**, not verified calibration settings. Start with the 90° left/right confirmation trials and adjust based on *actual measured yaw*, then validate the necessary 180° maneuver. The 0.2–0.6 s short-pulse results support modeling but do not establish full-size rotation accuracy.
+
+**Interpretation:** Both direction and duration affect the observed turning response. Under the same magnitude `0.5`, clockwise trials tended to turn further than counterclockwise trials; e.g., average 0.6 s rotations were **57.5° right versus 53.0° left**. Trial-to-trial variability was noticeable, indicating the need for realistic error bounds in the final open-loop route. The motor output is a normalized command, not a directly observed wheel-speed measurement. The ideal differential-drive model motivates in-place turning with opposite-sign side commands, while calibration supplies the actual command-duration conversion on the carpet.
+
+**Pending:** [TODO: measured 90° confirmation, measured 180° confirmation, any retuned durations. Update the controller parameters only after these tests.] 
 
 ### Final calibration parameters
 
 | Parameter | Final value | Units / interpretation |
 |---|---|---|
 | Forward motor command | **Provisional `[+0.130,+0.200]`** | normalized `[L,R]`; selected for 0.8 m / 4.0 s |
-| Left motor command | [TODO] | normalized `[L,R]` |
-| Right motor command | [TODO] | normalized `[L,R]` |
+| Left motor command | **Provisional `[-0.500,+0.500]`** | normalized `[L,R]`; used for measured calibration trials |
+| Right motor command | **Provisional `[+0.500,-0.500]`** | normalized `[L,R]`; used for measured calibration trials |
 | Forward speed \(\hat v_f\) | **Provisional 0.19949** | m/s; mean forward-axis displacement / 4 s, based on 2 repetitions; not yet a multitime fit |
-| Left turn rate \(\hat\omega_L\) | [TODO] | positive rad/s |
-| Right turn rate \(\hat\omega_R\) | [TODO] | negative rad/s |
+| Left turn rate \(\hat\omega_L\) | **Provisional +1.484** | rad/s; affine-fit slope over 0.2–0.6 s; confirm longer turns |
+| Right turn rate \(\hat\omega_R\) | **Provisional −1.527** | rad/s; affine-fit slope over 0.2–0.6 s; confirm longer turns |
 | Effective startup time correction, if used | **Not yet estimated for corrected command** | s; old 0.2/0.2 model should not be transferred |
 
 ## 4. Waypoint algorithm and software
@@ -180,7 +196,7 @@ Angle wrapping: \(\operatorname{wrap}(\alpha)=(\alpha+\pi)\bmod2\pi-\pi\).
 Replace these prompts with observations supported by your experiments:
 
 - **Translation error:** [TODO: difference between predicted and measured translation, trends with duration].
-- **Turning error:** [TODO: left/right asymmetry, repeated-turn drift, 90°/180° errors].
+- **Turning error and repeatability:** For identical 0.6-second magnitude-0.5 commands, left turns averaged 53.0° (n=2), and right turns averaged 57.5° in magnitude (n=2). At 0.4 s, repeated trials differed by 10° left and 11° right. These are directly measured yaw changes; final 90°/180° accuracy and accumulated route-heading error remain [TODO].
 - **Repeatability:** [TODO: variation across repeated calibration trials].
 - **Sources of uncertainty:** Wheel slip/skid steering, motor dead zone, startup response, floor friction, battery condition, command-timing variability, manual measurement error.
 - **Long-route accumulation:** [TODO: how initial heading errors affected later position errors].
