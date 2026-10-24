@@ -1,0 +1,114 @@
+{
+  "scale_m_per_unit": 0.8,
+  "publish_hz": 25.0,
+  "settle_sec": 0.3,
+  "forward": {
+    "commands": [
+      0.13,
+      0.2
+    ],
+    "meters_per_second": 0.174414,
+    "notes": "PROVISIONAL full-route model: mean body-forward movement 0.699m over four 4.01-second motions at [0.130,0.200], estimated 0.1744m/s; separate individual measurements 0.750,0.734,0.663,0.650m. Previous independent tests yielded 0.19949m/s. Needs short verification on this hardware/surface; forward speed may vary by leg."
+  },
+  "left": {
+    "commands": [
+      -0.5,
+      0.5
+    ],
+    "degrees_per_second": 129.28571,
+    "notes": "Post-deterioration painter-tape condition; 0.70s left 93/86 degrees and 1.40s left 182 degrees. Through-origin fallback 129.29 deg/s. Current mechanical setup is not verified safe; yaw accuracy does not establish translation accuracy. Waypoint 0->2 physical test succeeded, but left turn produced estimated 0.05-0.15 m translation toward negative world y; direct center-of-rotation model remains uncalibrated.",
+    "verified_current_hardware": false,
+    "duration_curve_deg_sec": [
+      [
+        0.0,
+        0.0
+      ],
+      [
+        89.5,
+        0.7
+      ],
+      [
+        182.0,
+        1.4
+      ]
+    ],
+    "timing_tested_current_configuration": true
+  },
+  "right": {
+    "commands": [
+      0.5,
+      -0.5
+    ],
+    "degrees_per_second": 84.4494,
+    "verified_current_hardware": false,
+    "notes": "Post-deterioration painter-tape condition; 0.90s clockwise 86/87 degrees; 2.10s 170 and 2.20s 182/188 degrees. Right-turn speed is duration dependent; 84.45 deg/s is a single-rate FALLBACK ONLY. Piecewise anchors require accompanying updated waypoint_controller.py. Right rear wheel fault not mechanically cleared. Timing VERIFIED BY YAW TRIALS in current painter-tape configuration: 0.90s right yielded 86/87 deg; 2.10s yielded 170 deg and 2.20s yielded 182/188 deg. Mechanical safety remains UNVERIFIED.",
+    "duration_curve_deg_sec": [
+      [
+        0.0,
+        0.0
+      ],
+      [
+        86.5,
+        0.9
+      ],
+      [
+        185.0,
+        2.2
+      ]
+    ],
+    "timing_tested_current_configuration": true
+  },
+  "hardware_condition": "right-rear wheel previously barely moved; painter tape applied in latest trials; exact mechanical effect and safety of tape not established; do not operate a bound or taped-over rotating wheel",
+  "route_observation": {
+    "tested_segments": [
+      1,
+      2
+    ],
+    "seg1_and_2_completed": true,
+    "left_turn_unintended_y_shift_approx_m": [
+      -0.15,
+      -0.05
+    ],
+    "left_turn_shift_measurement": "user-estimated during waypoint 0->2 run; not a separately measured chassis pose correction",
+    "caution": "Wheel issue and painter-tape workaround have not been mechanically cleared; do not restrain any wheel/shaft or operate if wheel stalls.",
+    "full_six_segment_run_completed": true,
+    "full_run_qualitative": "All 6 segments executed and broad route direction recognizable, but position deviations were large and accumulated. User reports first 3 turns biased somewhat left.",
+    "wp4_pre_final_turn_estimated_file_coordinates": [
+      2.0,
+      1.7
+    ],
+    "wp4_nominal_file_coordinates": [
+      2.0,
+      2.0
+    ],
+    "wp4_approx_y_shortfall_m": 0.24,
+    "wp4_uncertainty": "Visual rough estimate at end of translation from (2,1) to (2,2), BEFORE final heading turn, during full six-leg run. Not enough to attribute to forward undershoot vs prior-turn translation vs heading error.",
+    "turn_model_status": "effective pivot FITTED from measured four turns, enabled; separate left/right pivots; two turn samples per direction, uncertain",
+    "measured_checkpoint_sequence": "calibration/route_checkpoints.csv; 8 before/after action poses with center in meters and heading degrees, robot center measured manually",
+    "forward_current_4_leg_measured_body_dx_m": [
+      0.75,
+      0.7341,
+      0.6633,
+      0.6501
+    ],
+    "forward_speed_model_new_mps": 0.174414,
+    "measured_final_checkpoint_xy_m": [
+      1.71,
+      1.3
+    ],
+    "measured_final_checkpoint_yaw_deg": -88,
+    "checkpoint_refers_to": "after right ~180 degree turn at (2,2), not full route final waypoint"
+  },
+  "turn_center_shift": {
+    "enabled": true,
+    "left_90deg_body_m": [
+      -0.028675,
+      -0.095156
+    ],
+    "right_90deg_body_m": [
+      0.058743,
+      -0.06371
+    ],
+    "notes": "ENABLED: fitted 2D effective pivot separately for left and right from four within-route turn observations (world center x/y before/after, and measured body yaw). 2 left actual rotations +86/+76deg and 2 right -70/-174deg; least-squares pivot model. These are fitted equivalent 90deg body-frame shifts, not directly measured 90deg samples. TURN SHIFTS ARE VARIABLE; this remains open-loop, no feedback. Validate with short supervised segment runs and ensure workspace clearance."
+  }
+}
