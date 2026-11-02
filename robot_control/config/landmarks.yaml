@@ -1,0 +1,28 @@
+# CSE 276A HW2 landmark map
+# Units: meters and radians
+# World frame:
+#   origin = starting base_link pose
+#   +x = initial robot-forward direction
+#   +y = initial robot-left direction
+#   +z = upward
+#
+# face_yaw is the direction of the tag's outward-facing normal in the world xy-plane.
+
+tags:
+  0:
+    x: 0.800
+    y: 2.000
+    z: 0.152
+    face_yaw: -1.5707963267948966
+
+  1:
+    x: 2.000
+    y: -0.020
+    z: 0.234
+    face_yaw: 3.141592653589793
+
+  2:
+    x: 0.000
+    y: -0.400
+    z: 0.154
+    face_yaw: 1.5707963267948966
