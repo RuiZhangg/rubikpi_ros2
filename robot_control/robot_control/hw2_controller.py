@@ -134,12 +134,13 @@ class HW2Controller(Node):
 
         # Do not react to normal several-cm localization noise.
         self.cross_track_deadband = 0.060
-        self.cross_track_correct = 0.080
-
-        # Map lateral error to a small desired heading offset.
-        # 10 cm -> ~4 degrees.
-        self.cross_track_gain = 0.70
-        self.max_cross_heading = math.radians(7.0)
+        # Cross-track correction uses a bounded look-ahead geometry:
+        # correction = atan2(-cross_track, lookahead).
+        #
+        # This is intentionally stronger than the earlier fixed gain
+        # near the endpoint, while remaining bounded.
+        self.cross_track_lookahead = 0.35  # m
+        self.max_cross_heading = math.radians(12.0)
 
         # Heading thresholds.
         self.heading_deadband = math.radians(5.0)
@@ -147,7 +148,7 @@ class HW2Controller(Node):
 
         # Endpoint logic.
         self.endpoint_remaining_tol = 0.070
-        self.endpoint_distance_tol = 0.090
+        self.endpoint_distance_tol = 0.080
         self.max_waypoint_vision_age = 2.0
         self.max_drive_vision_age = 2.0
         self.max_near_drive_vision_age = 1.5
@@ -175,6 +176,7 @@ class HW2Controller(Node):
         # drive
         # align_segment
         # align_final
+        # seek_tag2
         self.stage = "waiting_for_vision"
 
         self.last_v = 0.0
@@ -397,6 +399,34 @@ class HW2Controller(Node):
             # remain fixed because this stage is an in-place turn.
             self.last_vision_time = now
 
+    def latest_yaw_for_tag(
+        self,
+        tag_id,
+        max_age=3.0,
+    ):
+        """
+        Return the newest recent yaw observation for one tag.
+        Used only to STOP the special tag-2 search immediately when
+        tag 2 first enters view.
+        """
+        now_s = (
+            self.get_clock().now().nanoseconds
+            / 1e9
+        )
+
+        for t, tag, yaw in reversed(
+            self.yaw_history
+        ):
+            if tag != tag_id:
+                continue
+
+            if now_s - t > max_age:
+                continue
+
+            return yaw
+
+        return None
+
     def stable_yaw_for_tag(
         self,
         tag_id,
@@ -526,6 +556,7 @@ class HW2Controller(Node):
         self,
         nominal,
         cross,
+        remaining,
     ):
         # Do not react inside the localization-noise deadband.
         if (
@@ -535,9 +566,21 @@ class HW2Controller(Node):
             correction = 0.0
 
         else:
-            correction = (
-                -self.cross_track_gain
-                * cross
+            # Use a look-ahead correction.  Near the endpoint the
+            # remaining distance naturally makes the required heading
+            # correction more important, but cap it to avoid aggressive
+            # turns from noisy position estimates.
+            lookahead = max(
+                0.20,
+                min(
+                    self.cross_track_lookahead,
+                    max(remaining, 0.20),
+                ),
+            )
+
+            correction = math.atan2(
+                -cross,
+                lookahead,
             )
 
             correction = max(
@@ -772,6 +815,96 @@ class HW2Controller(Node):
 
         return False
 
+    def seek_tag2_left(self):
+        """
+        Special hard-coded transition after waypoint 2.
+
+        Landmark geometry requires the rover to continue turning LEFT
+        after finishing waypoint-2 yaw=180 deg until tag 2 is actually
+        observed.  The coarse 3-deg/pulse prediction is NOT allowed to
+        finish this stage by itself.
+
+        Returns True only after a stable tag-2 yaw observation exists.
+        """
+        now = time.monotonic()
+
+        # Stop the search on the FIRST fresh tag-2 observation.
+        # With sub-1-Hz vision, waiting for two frames here could
+        # rotate past the tag before the second image arrives.
+        tag2_yaw = self.latest_yaw_for_tag(
+            2,
+            max_age=3.0,
+        )
+
+        if tag2_yaw is not None:
+            self.stop_robot()
+            self.state[2] = tag2_yaw
+            self.pulse_phase = "idle"
+
+            self.get_logger().info(
+                "Tag 2 first acquired after waypoint 2: "
+                f"visual yaw={math.degrees(tag2_yaw):.1f} deg. "
+                "Stopping search and switching to "
+                "return-segment alignment."
+            )
+
+            return True
+
+        # During the rest phase, hold still and wait for vision.
+        if self.pulse_phase == "rest":
+            self.stop_robot()
+
+            if now < self.phase_until:
+                return False
+
+            self.pulse_phase = "idle"
+
+        # Finish an active pulse.
+        if self.pulse_phase == "on":
+            if now < self.phase_until:
+                # Hard-coded LEFT turn only.
+                self.publish(
+                    0.0,
+                    +self.turn_cmd,
+                )
+                return False
+
+            self.stop_robot()
+
+            # Coarse prediction only; never used to terminate seek.
+            self.state[2] = wrap(
+                self.state[2]
+                + self.turn_per_pulse
+            )
+
+            self.pulse_phase = "rest"
+            self.phase_until = (
+                now
+                + self.turn_rest_s
+            )
+
+            return False
+
+        # Idle and still no tag 2: issue exactly one LEFT pulse.
+        self.status(
+            "SEEK TAG 2: no stable tag-2 visual pose yet; "
+            "continuing one calibrated LEFT pulse."
+        )
+
+        self.pulse_sign = 1.0
+        self.pulse_phase = "on"
+        self.phase_until = (
+            now
+            + self.turn_pulse_s
+        )
+
+        self.publish(
+            0.0,
+            +self.turn_cmd,
+        )
+
+        return False
+
     # ==========================================================
     # Control
     # ==========================================================
@@ -800,6 +933,7 @@ class HW2Controller(Node):
             self.desired_heading_for_segment(
                 nominal,
                 cross,
+                remaining,
             )
         )
 
@@ -853,8 +987,6 @@ class HW2Controller(Node):
             if (
                 endpoint_distance
                 <= self.endpoint_distance_tol
-                or remaining
-                <= self.endpoint_remaining_tol
             ):
                 self.stop_robot()
 
@@ -887,27 +1019,23 @@ class HW2Controller(Node):
             #
             # Stop if lateral or heading error is clearly outside
             # the measurement-noise deadband.
-            need_cross_correction = (
-                abs(cross)
-                >= self.cross_track_correct
-            )
-
+            # Cross-track error determines the desired heading.
+            # It must NOT by itself trigger a stop.  If the robot is
+            # already facing the corrective heading, it should keep
+            # translating so that the lateral error can actually shrink.
             need_heading_correction = (
                 abs(heading_error)
                 >= self.heading_correct
             )
 
-            if (
-                need_cross_correction
-                or need_heading_correction
-            ):
+            if need_heading_correction:
                 self.stop_robot()
 
                 self.stage = "align_segment"
                 self.pulse_phase = "idle"
 
                 self.get_logger().info(
-                    "Stopping for correction: "
+                    "Stopping for heading correction: "
                     f"cross={cross:.3f} m, "
                     f"heading_error="
                     f"{math.degrees(heading_error):.1f} deg, "
@@ -931,14 +1059,42 @@ class HW2Controller(Node):
             return
 
         # ------------------------------------------------------
+        # SPECIAL RETURN TRANSITION AFTER WAYPOINT 2
+        # ------------------------------------------------------
+        if self.stage == "seek_tag2":
+
+            found_tag2 = self.seek_tag2_left()
+
+            if found_tag2:
+                # wp is already 3 here.  Now that tag 2 provides a
+                # trustworthy visual yaw, finish aligning to the fixed
+                # return heading before any translation.
+                self.stage = "align_segment"
+                self.pulse_phase = "idle"
+
+                self.get_logger().info(
+                    "Preparing return to waypoint 0 using tag 2; "
+                    f"target heading="
+                    f"{math.degrees(self.segment_heading[3]):.1f} deg."
+                )
+
+            return
+
+        # ------------------------------------------------------
         # SEGMENT ALIGNMENT / CROSS-TRACK CORRECTION
         # ------------------------------------------------------
         if self.stage == "align_segment":
 
+            alignment_gate = (
+                math.radians(90.0)
+                if self.wp == 3
+                else math.radians(45.0)
+            )
+
             done = self.update_turn_pulse(
                 desired_heading,
                 expected_tag=expected_tag,
-                visual_gate=math.radians(45.0),
+                visual_gate=alignment_gate,
             )
 
             if done:
@@ -1012,15 +1168,30 @@ class HW2Controller(Node):
                 self.stop_robot()
                 return
 
-            # Before next translation, align to its nominal line.
-            self.stage = "align_segment"
             self.pulse_phase = "idle"
 
-            self.get_logger().info(
-                f"Preparing segment {self.wp}: "
-                f"nominal heading="
-                f"{math.degrees(self.segment_heading[self.wp]):.1f} deg."
-            )
+            # Hard-coded landmark-layout transition:
+            # after waypoint 2, keep turning LEFT until tag 2 is
+            # actually visible.  Do not trust pulse dead reckoning
+            # alone to start the return segment.
+            if reached == 2 and self.wp == 3:
+                self.stage = "seek_tag2"
+
+                self.get_logger().info(
+                    "Waypoint 2 complete. "
+                    "Hard-coded return transition: keep turning LEFT "
+                    "until tag 2 is visually acquired."
+                )
+
+            else:
+                # Normal transition for other segments.
+                self.stage = "align_segment"
+
+                self.get_logger().info(
+                    f"Preparing segment {self.wp}: "
+                    f"nominal heading="
+                    f"{math.degrees(self.segment_heading[self.wp]):.1f} deg."
+                )
 
     # ==========================================================
     # Logging
@@ -1047,6 +1218,7 @@ class HW2Controller(Node):
             self.desired_heading_for_segment(
                 nominal,
                 cross,
+                remaining,
             )
         )
 
