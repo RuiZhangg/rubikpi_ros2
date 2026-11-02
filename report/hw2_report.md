@@ -4,14 +4,9 @@
 **Video:** [YouTube unlisted link]  
 **Code:** ROS 2 packages submitted with this report
 
-<!--
-Working report template. Replace all [bracketed items] with final measurements/results.
-Keep the final report concise (~3 pages). The comments can be deleted before submission.
--->
-
 ## 1. System and Experimental Setup
 
-The goal of this assignment was to extend the open-loop waypoint controller from HW1 into a closed-loop controller using visual landmark feedback. The robot followed the required route
+The goal of this assignment is to extend the open-loop waypoint controller from HW1 into a closed-loop controller using visual landmark feedback. The robot follows the required route
 
 \[
 (0,0,0)\rightarrow(1,0,0)\rightarrow(1,2,\pi)\rightarrow(0,0,0),
@@ -19,55 +14,61 @@ The goal of this assignment was to extend the open-loop waypoint controller from
 
 while using AprilTag observations to correct drift in its internal pose estimate.
 
-The system consisted of four main parts: camera capture, AprilTag detection, pose estimation, and waypoint control. The waypoint controller maintained an estimate of the robot pose \((x,y,\theta)\). Between visual observations, this estimate was propagated using the commanded linear and angular velocities. When one or more valid AprilTags were detected, their known world poses were used to estimate the robot pose and correct the accumulated dead-reckoning error.
+The system contains four main stages: camera capture, AprilTag detection, pose estimation, and waypoint control. The waypoint controller maintains an estimate of the robot pose \((x,y,\theta)\). Between visual observations, this estimate is propagated using commanded motion. When valid AprilTags are detected, their known world poses are used to estimate the robot pose and correct accumulated dead-reckoning error.
 
 ![Closed-loop controller](figures/controller_diagram.png)
 
-<!--
-(a) The figure should show at least:
-camera -> AprilTag detector -> pose/localization -> waypoint controller -> /cmd_vel
-                                     ^                   |
-                                     |                   v
-                                  tag map              robot
-and the dead-reckoning/prediction path back into localization.
--->
-
-The main ROS 2 components used in the final system were:
-
 | Component | Input | Output / role |
 |---|---|---|
-| `robot_vision_camera` | Camera | Publishes image and camera calibration topics |
-| `apriltag_ros` | Camera image + intrinsics | Detects tags and estimates tag pose relative to the camera |
-| `[hw2 controller node]` | Tag poses + tag map + current motion estimate | Estimates robot pose, performs visual corrections, and generates waypoint commands |
+| `robot_vision_camera` | Camera | Publishes 1280×720 images and camera calibration |
+| `image_proc` | Raw image + camera calibration | Produces an undistorted/rectified image for landmark detection |
+| `apriltag_ros` | Rectified image + camera intrinsics | Detects `tag36h11` landmarks and estimates tag pose using PnP |
+| `[hw2 controller node]` | Tag poses + tag map + motion estimate | Estimates robot pose, applies visual corrections, and generates waypoint commands |
 | `velocity_mapping` | `/cmd_vel` | Converts linear/angular velocity commands to left/right motor commands |
 | `motor_control` | Left/right motor commands | Sends commands to the rover |
 
-### Camera and Motion Calibration
+### Camera Calibration
 
-The camera was calibrated before landmark localization using a printed checkerboard mounted flat on a rigid plastic board. The calibration target had **[columns × rows] inner corners** with a measured square size of **[___ m]**. We collected **[___]** calibration views covering the center, edges, different distances, and different orientations of the image.
+The Rubik Pi camera was calibrated before landmark localization because its raw image showed noticeable lens distortion. I printed a checkerboard with **9 × 6 inner corners** and **23 mm squares** on A4 paper and mounted it flat on a rigid plastic board. I collected **30** calibration images at 1280×720 while moving the board across the image, changing distance, and tilting it to provide coverage of the center, edges, and corners.
 
-Final camera calibration:
-- Image resolution: **1280 × 720**
-- \(f_x =\) **[___]**
-- \(f_y =\) **[___]**
-- \(c_x =\) **[___]**
-- \(c_y =\) **[___]**
-- Distortion coefficients: **[___]**
-- Calibration/reprojection error, if available: **[___]**
+OpenCV calibration produced an RMS reprojection error of **0.2699 px**. The intrinsic matrix was
 
-The camera-to-robot transform was estimated from the physical mounting geometry. The camera origin was approximately **[___ m forward/back]**, **[___ m left/right]**, and **[___ m above]** the robot center, with orientation **[___]** relative to the robot frame.
+\[
+K=
+\begin{bmatrix}
+631.0711 & 0 & 651.9864\\
+0 & 632.1226 & 337.2623\\
+0 & 0 & 1
+\end{bmatrix},
+\]
 
-We also recalibrated the rover's motion mapping before the final experiment. The final motion parameters were **[briefly list only the parameters actually changed]**. This calibration was only used for short-term dead reckoning; visual observations were responsible for correcting accumulated drift.
+with plumb-bob distortion coefficients
+
+\[
+(k_1,k_2,p_1,p_2,k_3)
+=
+(-0.340540,\ 0.136549,\ 0.000374,\ -0.000483,\ -0.027330).
+\]
+
+These parameters were saved in the camera configuration used by the ROS camera node. The calibrated image size is **1280 × 720**. I verified the integration through `/camera/camera_info`; the running node published the same intrinsic matrix and distortion coefficients, confirming that the new calibration file was loaded correctly.
+
+For landmark detection, the raw image is rectified using `image_proc` before being passed to `apriltag_ros`. This keeps the image geometry consistent with the rectified camera projection model used for AprilTag pose estimation.
+
+### Camera-to-Robot Transform and Motion Calibration
+
+The fixed camera-to-robot transform was measured from the physical mounting geometry. The camera origin was approximately **[___ m forward/back]**, **[___ m left/right]**, and **[___ m above]** the robot center, with orientation **[___]** relative to the vehicle frame.
+
+The rover's motion mapping was also recalibrated before the final experiment. The final parameters were **[briefly list only parameters actually changed]**. This calibration is used for short-term dead reckoning, while visual observations correct accumulated drift.
 
 ### Coordinate Frames and Start Pose
 
-The **world frame** was defined with its origin at the first waypoint. \(+x\) pointed **[direction in room]**, \(+y\) pointed **[direction in room]**, and positive yaw was counterclockwise. The robot started at
+The **world frame** has its origin at the first waypoint. \(+x\) points **[direction in room]**, \(+y\) points **[direction in room]**, and positive yaw is counterclockwise. The robot starts at
 
 \[
 (x,y,\theta)=(0,0,0).
 \]
 
-The **vehicle frame** was centered at **[robot center definition]**, with \(+x\) pointing forward and \(+y\) pointing left. The **camera frame** followed the convention used by the camera/AprilTag ROS pipeline. The fixed camera-to-vehicle transform above was used when converting AprilTag measurements into robot poses in the world frame.
+The **vehicle frame** is centered at **[robot center definition]**, with \(+x\) pointing forward and \(+y\) pointing left. The **camera optical frame** has \(+x\) to the image right, \(+y\) downward, and \(+z\) forward from the camera. The fixed camera-to-vehicle transform is used to convert AprilTag measurements into robot poses in the world frame.
 
 ---
 
@@ -75,38 +76,28 @@ The **vehicle frame** was centered at **[robot center definition]**, with \(+x\)
 
 ### (b) Landmark Selection and Placement
 
-We used **AprilTags** from the **[tag family, e.g. tag36h11]** family. Each tag had a measured detection size of **[___ m]** and a unique ID. The tags were mounted on rigid surfaces around the test area so that the robot had useful visual coverage before and after major turns without placing the tags extremely close to the camera.
+I used **AprilTags from the `tag36h11` family**. The ROS detector was configured to use PnP pose estimation. Each physical tag was assigned a unique ID, and its measured detection-edge size was entered in the detector configuration before pose estimation.
 
-| Tag ID | World pose \((x,y,\theta)\) | Placement | Reason |
-|---:|---|---|---|
-| [ ] | [ ] | [ ] | [ ] |
-| [ ] | [ ] | [ ] | [ ] |
-| [ ] | [ ] | [ ] | [ ] |
-| [ ] | [ ] | [ ] | [ ] |
+| Tag ID | Detection-edge size | World pose \((x,y,\theta)\) | Placement | Reason |
+|---:|---:|---|---|---|
+| [ ] | [ ] m | [ ] | [ ] | [ ] |
+| [ ] | [ ] m | [ ] | [ ] | [ ] |
+| [ ] | [ ] m | [ ] | [ ] | [ ] |
+| [ ] | [ ] m | [ ] | [ ] | [ ] |
 
-The placement was chosen to balance visibility and pose accuracy. Tags that were too close could leave the camera field of view or produce difficult viewing angles, while tags that were too far away occupied fewer pixels and gave noisier pose estimates. We especially placed tags near **[turns / long segments / waypoint regions actually used]**, where open-loop drift was most likely to affect the route.
+The tags were mounted on rigid surfaces around the test area so that useful observations were available before and after major turns. Their placement balances visibility and pose accuracy: very close tags can leave the camera field of view or be observed at extreme angles, while distant tags occupy fewer pixels and produce noisier pose estimates. Tags were therefore placed especially near **[turns / long segments / waypoint regions actually used]**, where open-loop drift was most likely to affect the route.
 
 ### (c) Robot Pose Estimation and Measurement Noise
 
-For each detected tag, the detector provided the transform from the tag frame to the camera frame. Let \(^{W}T_T\) be the known tag pose in the world, \(^{C}T_T\) the measured tag pose in the camera frame, and \(^{R}T_C\) the fixed camera pose in the robot frame. The corresponding robot pose estimate was computed from the transform chain
+For each detected tag, `apriltag_ros` estimates the transform between the camera and tag using the calibrated camera model and the known physical tag size. Using the known tag pose in the world and the fixed camera-to-robot transform, I compute a robot pose estimate in the world frame.
 
-\[
-^{W}T_R
-=
-^{W}T_T
-(^{C}T_T)^{-1}
-(^{R}T_C)^{-1}.
-\]
-
-<!-- Verify the exact TF direction used in the final implementation and edit this equation if necessary. -->
-
-To reduce measurement noise, we **[describe actual method: e.g. rejected detections beyond a residual threshold / averaged several recent estimates / combined multiple visible tags with weights / used the closest tag]**. We chose this method because **[brief motivation tied to observed noise]**. Visual corrections were applied **[continuously / at selected points / only while stopped]**, which reduced accumulated dead-reckoning error without allowing isolated noisy measurements to cause large control changes.
+To reduce measurement noise, I **[describe actual method: reject large residuals / average recent estimates / combine multiple visible tags / use closest valid tag]**. I chose this method because **[brief motivation tied to observed measurements]**. Visual corrections are applied **[continuously / at selected points / while stopped]**, reducing accumulated dead-reckoning error without allowing isolated noisy measurements to cause large control changes.
 
 ### (d) No-Landmark Behavior
 
-When no landmark was visible, the robot **[describe actual behavior]**. In our final implementation, this allowed the robot to continue for short intervals using its motion estimate rather than stopping immediately. **[If applicable: If no valid landmark was observed for ___ s / near a waypoint, the robot performed ___ to reacquire a tag.]**
+When no landmark is visible, the robot **[describe actual behavior]**. During these intervals it can continue for a short period using its internal motion estimate. **[If applicable: near a waypoint or after ___ s without a valid observation, the robot performs ___ to reacquire a tag.]**
 
-This behavior was useful because the camera could not observe every landmark continuously along the full route.
+This behavior is necessary because the camera cannot observe every landmark continuously along the complete route.
 
 ---
 
@@ -114,37 +105,25 @@ This behavior was useful because the camera could not observe every landmark con
 
 ### (f) Path Smoothness and Correction Behavior
 
-Figure 2 shows the estimated trajectory of the final run. The main corrections occurred **[where]**. Along the first segment, the robot **[slightly under-corrected / over-corrected / remained close to the reference]**, with corrections of approximately **[___]**. Near the second waypoint, **[describe behavior]**. On the return segment, **[describe behavior]**.
+Figure 2 shows the estimated trajectory of the final run. Along the first segment, the robot **[under-corrected / over-corrected / stayed close to the reference]**, with corrections of approximately **[___]**. Near the second waypoint, **[describe behavior]**. On the return segment, **[describe behavior]**.
 
-Overall, the path was **[smooth / moderately oscillatory / etc.]**. The trajectory shows **[whether corrections generally converged toward the reference or alternated across it]**. We intentionally used **[small/frequent or larger/infrequent]** corrections because **[brief reason]**. By the time the robot reached each waypoint, **[describe how much residual error remained and whether the controller made a final correction]**.
+Overall, the path was **[smooth / moderately oscillatory / etc.]**. The trajectory shows **[whether corrections converged toward the reference or alternated across it]**. The controller used **[small/frequent or larger/infrequent]** corrections because **[brief reason]**. By each waypoint, **[describe remaining error and any final correction]**.
 
 ![Estimated trajectory](figures/trajectory.png)
 
-<!--
-Use the path itself to discuss:
-- under- vs over-correction
-- how much correction happens within each segment
-- how much is left to correct near each waypoint
-This directly follows the Piazza clarification for part (f).
--->
-
 ### (g) Total Distance Travelled
 
-We estimated translational distance by summing the displacement of the robot center between successive logged pose estimates:
+I estimated translational distance by summing displacement of the robot center between successive logged pose estimates:
 
 \[
 D=\sum_k \sqrt{(x_{k+1}-x_k)^2+(y_{k+1}-y_k)^2}.
 \]
 
-The final estimated translational distance was **[___ m]**. We report translation of the robot center and exclude in-place rotation from this value.
-
-<!-- Piazza clarification says rotation may be ignored. If useful, optionally add:
-"The robot additionally accumulated approximately [___ rad] of in-place rotation."
--->
+The final estimated translational distance was **[___ m]**. In-place rotation is excluded from this value.
 
 ### (h) Waypoint Errors
 
-Waypoint error was computed from the robot's onboard pose estimate when the controller declared each waypoint reached. Translation error is the Euclidean position difference from the target; rotation error is the wrapped yaw difference. The floor waypoint markers and final video provide a visual check that the robot physically reached the intended locations.
+Waypoint error was computed from the robot's onboard pose estimate when the controller declared each waypoint reached. Translation error is the Euclidean position difference from the target, and rotation error is the wrapped yaw difference. Floor waypoint markers and the final video provide a visual check that the robot physically reached the intended locations.
 
 | Waypoint | Target pose \((x,y,\theta)\) | Estimated pose at arrival | Translation error | Rotation error |
 |---|---|---|---:|---:|
@@ -155,22 +134,22 @@ Waypoint error was computed from the robot's onboard pose estimate when the cont
 
 ### (i) Estimated 2D Trajectory
 
-The controller logged its internal pose estimate throughout the run at approximately **[0.5 / 1.0] s** intervals. During periods with no visible AprilTag, the plotted pose came from the controller's dead-reckoning estimate; after valid landmark observations, the corrected pose was used. Figure 2 plots these estimates in the world frame together with the required waypoints.
-
-<!-- Generate from logs, not manually from video. -->
+The controller logs its internal pose estimate throughout the run at approximately **[0.5 / 1.0] s** intervals. During periods without a visible AprilTag, the plotted pose comes from the controller's dead-reckoning estimate; after valid landmark observations, the corrected pose is used. Figure 2 plots these estimates in the world frame together with the required waypoints.
 
 ### (j) Overall Performance
 
-The final system **[briefly summarize success]**. Compared with open-loop motion, visual feedback was most useful for **[e.g. correcting heading drift after turns / reducing accumulated position error on long segments]**. The largest remaining source of error was **[camera pose noise / wheel slip / imperfect camera extrinsic / intermittent tag visibility / controller overshoot]**.
+The final system **[briefly summarize success]**. Compared with open-loop motion, visual feedback was most useful for **[correcting heading drift after turns / reducing accumulated error on long segments / etc.]**. The largest remaining source of error was **[camera pose noise / wheel slip / imperfect camera extrinsic / intermittent tag visibility / controller overshoot]**.
 
-The main limitation of our implementation is **[___]**. With more time, we would improve **[one or two concrete items only: e.g. multi-tag fusion, camera extrinsic calibration, smoother continuous steering]**. Despite these limitations, the experiment demonstrated the intended closed-loop behavior: landmark observations were used to estimate the robot pose and correct motion errors while following the required waypoint sequence.
+The main limitation of the implementation is **[___]**. With more time, I would improve **[one or two concrete items only]**. Despite these limitations, the experiment demonstrates the intended closed-loop behavior: landmark observations are used to estimate the robot pose and correct motion errors while following the required waypoint sequence.
 
 ---
 
 ## Final Run Summary
 
 - Final video: **[link]**
-- Camera calibration file: **[path/name]**
+- Camera calibration: **30 images, 1280×720, RMS 0.2699 px**
+- AprilTag family: **tag36h11**
+- Pose estimation method: **PnP**
 - Number of AprilTags used: **[___]**
 - Final route completion: **[successful / description]**
 - Total translational distance: **[___ m]**
