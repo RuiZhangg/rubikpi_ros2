@@ -5,6 +5,7 @@ import csv
 import math
 import os
 import time
+from collections import deque
 
 import numpy as np
 import rclpy
@@ -13,17 +14,40 @@ from rclpy.node import Node
 from std_msgs.msg import Int32
 
 
-def wrap_angle(a):
+def wrap(a):
     return (a + math.pi) % (2.0 * math.pi) - math.pi
 
 
-def quaternion_to_yaw(q):
-    siny = 2.0 * (q.w * q.z + q.x * q.y)
-    cosy = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
-    return math.atan2(siny, cosy)
+def q_to_yaw(q):
+    return math.atan2(
+        2.0 * (q.w * q.z + q.x * q.y),
+        1.0 - 2.0 * (q.y * q.y + q.z * q.z),
+    )
+
+
+def circ_mean(values):
+    if not values:
+        return None
+    return math.atan2(
+        sum(math.sin(v) for v in values),
+        sum(math.cos(v) for v in values),
+    )
 
 
 class HW2Controller(Node):
+    """
+    Accuracy-first controller for very slow/intermittent vision and
+    highly nonlinear turning.
+
+    Core policy:
+      * Translate with angular.z = 0.
+      * Turn only while stopped.
+      * One turn pulse = angular.z +/-0.002 for 0.10 s.
+      * Calibrated pulse size ~= 3 deg.
+      * Wait 1.8 s after each pulse for vision before deciding again.
+      * Use known straight-line route geometry and cross-track error.
+    """
+
     def __init__(self, stop_after):
         super().__init__("hw2_controller")
 
@@ -32,97 +56,186 @@ class HW2Controller(Node):
         self.create_subscription(
             PoseStamped,
             "/hw2/vision_pose",
-            self.vision_callback,
+            self.on_vision,
             10,
         )
 
         self.create_subscription(
             Int32,
             "/hw2/vision_tag_id",
-            self.tag_callback,
+            self.on_tag,
             10,
         )
 
-        # Physical route: 0.8 m per course coordinate unit.
-        self.waypoints = np.array([
-            [0.0, 0.0, 0.0],
-            [0.8, 0.0, 0.0],
-            [0.8, 1.6, math.pi],
-            [0.0, 0.0, 0.0],
+        # ------------------------------------------------------
+        # Route geometry
+        # ------------------------------------------------------
+        self.points = np.array([
+            [0.0, 0.0],
+            [0.8, 0.0],
+            [0.8, 1.6],
+            [0.0, 0.0],
         ], dtype=float)
 
-        self.current_state = np.array([0.0, 0.0, 0.0], dtype=float)
+        self.final_yaw = {
+            0: 0.0,
+            1: 0.0,
+            2: math.pi,
+            3: 0.0,
+        }
+
+        self.segment_heading = {
+            1: 0.0,
+            2: math.pi / 2.0,
+            3: math.atan2(-1.6, -0.8),
+        }
+
+        self.segment_tag = {
+            1: 1,
+            2: 0,
+            3: 2,
+        }
+
+        self.stop_after = stop_after
+        self.wp = 0
+
+        # x, y, yaw
+        self.state = np.zeros(3, dtype=float)
 
         self.have_vision = False
         self.last_vision_time = None
-        self.last_tag_id = -1
+        self.last_tag = -1
 
-        # Blend visual correction into dead reckoning to avoid jumps.
-        self.vision_alpha_xy = 0.50
-        self.vision_alpha_yaw = 0.60
+        # ------------------------------------------------------
+        # Visual estimator
+        # ------------------------------------------------------
+        self.position_alpha = 0.40
+        self.max_position_innovation = 0.25
+        self.max_position_step = 0.025
 
-        # Reject clearly impossible single-frame jumps after initialization.
-        self.max_vision_position_jump = 0.45   # m
-        self.max_vision_yaw_jump = math.radians(45.0)
+        # Keep recent yaw by tag for stationary observations.
+        self.yaw_history = deque(maxlen=100)
 
-        # Controller settings.
-        self.position_tolerance = 0.07          # m
-        self.angle_tolerance = math.radians(6.0)
+        # Vision is slow, so use a longer window and only 2
+        # consistent samples for a stationary yaw estimate.
+        self.yaw_window = 3.0
+        self.yaw_cluster_radius = math.radians(5.0)
+        self.min_yaw_cluster = 2
 
-        self.max_linear = 0.14                  # m/s
-        self.max_angular_drive = 0.70           # rad/s
-        self.rotate_speed = 0.60                # rad/s
+        # A yaw observation must be physically plausible for the
+        # current segment to be used during translation/alignment.
+        self.segment_yaw_gate = math.radians(20.0)
 
-        self.kp_distance = 0.55
-        self.kp_heading_drive = 1.30
+        # ------------------------------------------------------
+        # Translation controller
+        # ------------------------------------------------------
+        self.drive_speed = 0.040
+        self.near_speed = 0.025
 
-        self.dt = 0.10
-        self.waypoint_idx = 0
-        self.stop_after = stop_after
+        # Do not react to normal several-cm localization noise.
+        self.cross_track_deadband = 0.060
+        self.cross_track_correct = 0.080
+
+        # Map lateral error to a small desired heading offset.
+        # 10 cm -> ~4 degrees.
+        self.cross_track_gain = 0.70
+        self.max_cross_heading = math.radians(7.0)
+
+        # Heading thresholds.
+        self.heading_deadband = math.radians(5.0)
+        self.heading_correct = math.radians(7.0)
+
+        # Endpoint logic.
+        self.endpoint_remaining_tol = 0.070
+        self.endpoint_distance_tol = 0.090
+        self.max_waypoint_vision_age = 2.0
+        self.max_drive_vision_age = 2.0
+        self.max_near_drive_vision_age = 1.5
+
+        # ------------------------------------------------------
+        # Pulse turning
+        # ------------------------------------------------------
+        self.turn_cmd = 0.002
+        self.turn_pulse_s = 0.10
+        self.turn_rest_s = 1.80
+
+        # Measured from 10-pulse calibration:
+        # ~30 deg total -> ~3 deg / pulse.
+        self.turn_per_pulse = math.radians(3.0)
+
+        # When deciding that a stationary turn is complete.
+        self.turn_done_tol = math.radians(3.5)
+
+        # Pulse state.
+        self.pulse_phase = "idle"   # idle, on, rest
+        self.pulse_sign = 0.0
+        self.phase_until = 0.0
+
+        # Modes:
+        # drive
+        # align_segment
+        # align_final
         self.stage = "waiting_for_vision"
 
-        self.last_linear_cmd = 0.0
-        self.last_angular_cmd = 0.0
+        self.last_v = 0.0
+        self.last_w = 0.0
 
-        self.start_monotonic = time.monotonic()
+        self.dt = 0.05
+        self.start_time = time.monotonic()
+        self.last_status = 0.0
 
+        # ------------------------------------------------------
+        # Logs
+        # ------------------------------------------------------
         log_dir = os.path.expanduser("~/hw2_logs")
         os.makedirs(log_dir, exist_ok=True)
 
         stamp = time.strftime("%Y%m%d_%H%M%S")
 
-        self.trajectory_path = os.path.join(
-            log_dir, f"trajectory_{stamp}.csv"
-        )
-        self.waypoint_path = os.path.join(
-            log_dir, f"waypoints_{stamp}.csv"
+        self.traj_path = os.path.join(
+            log_dir,
+            f"trajectory_{stamp}.csv",
         )
 
-        self.trajectory_file = open(
-            self.trajectory_path, "w", newline=""
+        self.wp_path = os.path.join(
+            log_dir,
+            f"waypoints_{stamp}.csv",
         )
-        self.trajectory_writer = csv.writer(self.trajectory_file)
-        self.trajectory_writer.writerow([
+
+        self.traj_f = open(
+            self.traj_path,
+            "w",
+            newline="",
+        )
+
+        self.traj = csv.writer(self.traj_f)
+
+        self.traj.writerow([
             "time_s",
             "x_m",
             "y_m",
             "yaw_rad",
             "target_index",
-            "target_x_m",
-            "target_y_m",
-            "target_yaw_rad",
             "stage",
+            "cross_track_m",
+            "remaining_m",
+            "desired_heading_rad",
             "linear_cmd_mps",
             "angular_cmd_radps",
             "vision_age_s",
             "tag_id",
+            "pulse_phase",
         ])
 
-        self.waypoint_file = open(
-            self.waypoint_path, "w", newline=""
+        self.wp_f = open(
+            self.wp_path,
+            "w",
+            newline="",
         )
-        self.waypoint_writer = csv.writer(self.waypoint_file)
-        self.waypoint_writer.writerow([
+
+        self.wp_writer = csv.writer(self.wp_f)
+
+        self.wp_writer.writerow([
             "waypoint_index",
             "target_x_m",
             "target_y_m",
@@ -135,297 +248,827 @@ class HW2Controller(Node):
             "time_s",
         ])
 
-        self.control_timer = self.create_timer(
-            self.dt, self.control_loop
+        self.create_timer(
+            self.dt,
+            self.control,
         )
-        self.log_timer = self.create_timer(
-            0.50, self.log_state
+
+        self.create_timer(
+            0.50,
+            self.log_state,
         )
 
         self.get_logger().info(
-            "HW2 controller started; waiting for first /hw2/vision_pose."
-        )
-        self.get_logger().info(
-            f"Trajectory log: {self.trajectory_path}"
-        )
-        self.get_logger().info(
-            f"Waypoint log: {self.waypoint_path}"
+            "Pulse-turn accuracy-first HW2 controller started."
         )
 
-    def tag_callback(self, msg):
-        self.last_tag_id = int(msg.data)
+        self.get_logger().info(
+            "Turn calibration: angular.z=0.002, "
+            "0.10 s pulse ~= 3 deg, 1.80 s observe/rest."
+        )
 
-    def vision_callback(self, msg):
-        measurement = np.array([
+        self.get_logger().info(
+            f"Trajectory log: {self.traj_path}"
+        )
+
+        self.get_logger().info(
+            f"Waypoint log: {self.wp_path}"
+        )
+
+    # ==========================================================
+    # Vision
+    # ==========================================================
+
+    def on_tag(self, msg):
+        self.last_tag = int(msg.data)
+
+    def on_vision(self, msg):
+        now = self.get_clock().now()
+        now_s = now.nanoseconds / 1e9
+
+        m = np.array([
             msg.pose.position.x,
             msg.pose.position.y,
-            quaternion_to_yaw(msg.pose.orientation),
+            q_to_yaw(msg.pose.orientation),
         ], dtype=float)
 
-        now = self.get_clock().now()
+        tag = self.last_tag
 
+        if tag >= 0:
+            self.yaw_history.append(
+                (now_s, tag, float(m[2]))
+            )
+
+        # ------------------------------------------------------
+        # Known initial pose
+        # ------------------------------------------------------
         if not self.have_vision:
-            self.current_state = measurement.copy()
             self.have_vision = True
             self.last_vision_time = now
 
-            self.get_logger().info(
-                "Initialized from vision: "
-                f"x={measurement[0]:.3f}, "
-                f"y={measurement[1]:.3f}, "
-                f"yaw={math.degrees(measurement[2]):.1f} deg"
+            # Log measured localization error first.
+            self.state = m.copy()
+
+            self.record_waypoint(
+                0,
+                np.array([
+                    0.0,
+                    0.0,
+                    0.0,
+                ]),
             )
 
-            # The experiment physically starts at waypoint 0. Record the
-            # measured starting error but do not waste time "correcting"
-            # back to the origin before beginning the route.
-            self.record_waypoint(0, self.waypoints[0])
+            self.get_logger().info(
+                "Initial visual pose: "
+                f"({m[0]:.3f}, {m[1]:.3f}, "
+                f"{math.degrees(m[2]):.1f} deg)"
+            )
 
-            if self.stop_after <= 0:
-                self.waypoint_idx = len(self.waypoints)
+            # Physical start is known exactly.
+            self.state[:] = [
+                0.0,
+                0.0,
+                0.0,
+            ]
+
+            if self.stop_after == 0:
+                self.wp = len(self.points)
                 self.stop_robot()
                 return
 
-            self.waypoint_idx = 1
-            self.stage = "rotate_to_goal"
+            self.wp = 1
+            self.stage = "drive"
+
+            self.get_logger().info(
+                "Anchored to known start (0,0,0); "
+                "driving segment 1 straight."
+            )
+
             return
 
-        pos_jump = math.hypot(
-            measurement[0] - self.current_state[0],
-            measurement[1] - self.current_state[1],
+        # ------------------------------------------------------
+        # Position correction
+        # ------------------------------------------------------
+        # Freeze x,y during in-place turns.  The robot is not
+        # translating, and PnP/tag-switch noise should not move the
+        # estimated world position while it is physically stationary.
+        if self.stage == "drive":
+            e_xy = (
+                m[:2]
+                - self.state[:2]
+            )
+
+            innovation = float(
+                np.linalg.norm(e_xy)
+            )
+
+            if (
+                innovation
+                <= self.max_position_innovation
+            ):
+                step = (
+                    self.position_alpha
+                    * e_xy
+                )
+
+                step_norm = float(
+                    np.linalg.norm(step)
+                )
+
+                if step_norm > self.max_position_step:
+                    step *= (
+                        self.max_position_step
+                        / step_norm
+                    )
+
+                self.state[0] += step[0]
+                self.state[1] += step[1]
+
+                self.last_vision_time = now
+
+            else:
+                self.get_logger().warn(
+                    f"Rejected visual position innovation "
+                    f"{innovation:.3f} m "
+                    f"(tag {tag})"
+                )
+        else:
+            # A fresh image/yaw observation still arrived, but x,y
+            # remain fixed because this stage is an in-place turn.
+            self.last_vision_time = now
+
+    def stable_yaw_for_tag(
+        self,
+        tag_id,
+        target_yaw=None,
+        gate=None,
+    ):
+        now_s = (
+            self.get_clock().now().nanoseconds
+            / 1e9
         )
-        yaw_jump = abs(
-            wrap_angle(measurement[2] - self.current_state[2])
+
+        vals = []
+
+        for t, tag, yaw in self.yaw_history:
+            if tag != tag_id:
+                continue
+
+            if now_s - t > self.yaw_window:
+                continue
+
+            if (
+                target_yaw is not None
+                and gate is not None
+                and abs(
+                    wrap(
+                        yaw - target_yaw
+                    )
+                ) > gate
+            ):
+                continue
+
+            vals.append(yaw)
+
+        if len(vals) < self.min_yaw_cluster:
+            return None
+
+        best = []
+
+        for center in vals:
+            cluster = [
+                yaw
+                for yaw in vals
+                if abs(
+                    wrap(
+                        yaw - center
+                    )
+                )
+                <= self.yaw_cluster_radius
+            ]
+
+            if len(cluster) > len(best):
+                best = cluster
+
+        if len(best) < self.min_yaw_cluster:
+            return None
+
+        return circ_mean(best)
+
+    # ==========================================================
+    # Geometry
+    # ==========================================================
+
+    def segment_geometry(self):
+        start = self.points[
+            self.wp - 1
+        ]
+
+        end = self.points[
+            self.wp
+        ]
+
+        delta = end - start
+
+        length = float(
+            np.linalg.norm(delta)
+        )
+
+        tangent = (
+            delta / length
+        )
+
+        left_normal = np.array([
+            -tangent[1],
+            tangent[0],
+        ])
+
+        rel = (
+            self.state[:2]
+            - start
+        )
+
+        along = float(
+            np.dot(
+                rel,
+                tangent,
+            )
+        )
+
+        cross = float(
+            np.dot(
+                rel,
+                left_normal,
+            )
+        )
+
+        remaining = (
+            length - along
+        )
+
+        endpoint_distance = float(
+            np.linalg.norm(
+                end
+                - self.state[:2]
+            )
+        )
+
+        return (
+            start,
+            end,
+            self.segment_heading[self.wp],
+            cross,
+            remaining,
+            endpoint_distance,
+        )
+
+    def desired_heading_for_segment(
+        self,
+        nominal,
+        cross,
+    ):
+        # Do not react inside the localization-noise deadband.
+        if (
+            abs(cross)
+            <= self.cross_track_deadband
+        ):
+            correction = 0.0
+
+        else:
+            correction = (
+                -self.cross_track_gain
+                * cross
+            )
+
+            correction = max(
+                -self.max_cross_heading,
+                min(
+                    self.max_cross_heading,
+                    correction,
+                ),
+            )
+
+        return wrap(
+            nominal + correction
+        )
+
+    # ==========================================================
+    # Helpers
+    # ==========================================================
+
+    def vision_age(self):
+        if self.last_vision_time is None:
+            return float("inf")
+
+        return (
+            self.get_clock().now()
+            - self.last_vision_time
+        ).nanoseconds / 1e9
+
+    def publish(
+        self,
+        linear=0.0,
+        angular=0.0,
+    ):
+        msg = Twist()
+
+        msg.linear.x = float(linear)
+        msg.angular.z = float(angular)
+
+        self.cmd_pub.publish(msg)
+
+        self.last_v = float(linear)
+        self.last_w = float(angular)
+
+    def stop_robot(self):
+        self.publish(
+            0.0,
+            0.0,
+        )
+
+    def status(self, text):
+        now = time.monotonic()
+
+        if (
+            now - self.last_status
+            >= 1.0
+        ):
+            self.last_status = now
+            self.get_logger().info(
+                text
+            )
+
+    def record_waypoint(
+        self,
+        idx,
+        target,
+    ):
+        px, py, yaw = target
+
+        translation_error = math.hypot(
+            px - self.state[0],
+            py - self.state[1],
+        )
+
+        rotation_error = abs(
+            wrap(
+                yaw
+                - self.state[2]
+            )
+        )
+
+        self.wp_writer.writerow([
+            idx,
+            px,
+            py,
+            yaw,
+            self.state[0],
+            self.state[1],
+            self.state[2],
+            translation_error,
+            rotation_error,
+            time.monotonic()
+            - self.start_time,
+        ])
+
+        self.wp_f.flush()
+
+        self.get_logger().info(
+            f"WAYPOINT {idx}: "
+            f"pose=({self.state[0]:.3f}, "
+            f"{self.state[1]:.3f}, "
+            f"{math.degrees(self.state[2]):.1f} deg), "
+            f"position_error={translation_error:.3f} m, "
+            f"yaw_error={math.degrees(rotation_error):.1f} deg"
+        )
+
+    # ==========================================================
+    # Pulse turn logic
+    # ==========================================================
+
+    def update_turn_pulse(
+        self,
+        desired_yaw,
+        expected_tag=None,
+        visual_gate=None,
+    ):
+        """
+        Returns True when alignment is complete.
+        Otherwise this method owns /cmd_vel while turning/resting.
+        """
+        now = time.monotonic()
+
+        # ------------------------------------------------------
+        # If resting, hold zero command and wait for observation.
+        # ------------------------------------------------------
+        if self.pulse_phase == "rest":
+            self.stop_robot()
+
+            if now < self.phase_until:
+                return False
+
+            # Rest finished. Use stable visual yaw if available.
+            if expected_tag is not None:
+                visual_yaw = self.stable_yaw_for_tag(
+                    expected_tag,
+                    desired_yaw,
+                    visual_gate,
+                )
+
+                if visual_yaw is not None:
+                    self.state[2] = visual_yaw
+
+                    self.get_logger().info(
+                        "Turn observation: "
+                        f"tag={expected_tag}, "
+                        f"yaw={math.degrees(visual_yaw):.1f} deg"
+                    )
+
+            self.pulse_phase = "idle"
+
+        # ------------------------------------------------------
+        # Active pulse.
+        # ------------------------------------------------------
+        if self.pulse_phase == "on":
+
+            if now < self.phase_until:
+                self.publish(
+                    0.0,
+                    self.pulse_sign
+                    * self.turn_cmd,
+                )
+
+                return False
+
+            # Pulse complete.
+            self.stop_robot()
+
+            # Update only a coarse internal prediction.
+            self.state[2] = wrap(
+                self.state[2]
+                + self.pulse_sign
+                * self.turn_per_pulse
+            )
+
+            self.pulse_phase = "rest"
+            self.phase_until = (
+                now
+                + self.turn_rest_s
+            )
+
+            return False
+
+        # ------------------------------------------------------
+        # Idle: evaluate current yaw.
+        # ------------------------------------------------------
+        if expected_tag is not None:
+            visual_yaw = self.stable_yaw_for_tag(
+                expected_tag,
+                desired_yaw,
+                visual_gate,
+            )
+
+            if visual_yaw is not None:
+                self.state[2] = visual_yaw
+
+        error = wrap(
+            desired_yaw
+            - self.state[2]
+        )
+
+        self.status(
+            "TURN: "
+            f"target={math.degrees(desired_yaw):.1f}, "
+            f"state={math.degrees(self.state[2]):.1f}, "
+            f"error={math.degrees(error):.1f}"
         )
 
         if (
-            pos_jump > self.max_vision_position_jump
-            or yaw_jump > self.max_vision_yaw_jump
+            abs(error)
+            <= self.turn_done_tol
         ):
-            self.get_logger().warn(
-                "Rejected visual jump: "
-                f"position={pos_jump:.3f} m, "
-                f"yaw={math.degrees(yaw_jump):.1f} deg"
-            )
-            return
+            self.stop_robot()
+            return True
 
-        a = self.vision_alpha_xy
-        self.current_state[0] = (
-            (1.0 - a) * self.current_state[0]
-            + a * measurement[0]
-        )
-        self.current_state[1] = (
-            (1.0 - a) * self.current_state[1]
-            + a * measurement[1]
+        # Start exactly one calibrated pulse.
+        self.pulse_sign = (
+            1.0
+            if error > 0.0
+            else -1.0
         )
 
-        yaw_error = wrap_angle(
-            measurement[2] - self.current_state[2]
-        )
-        self.current_state[2] = wrap_angle(
-            self.current_state[2]
-            + self.vision_alpha_yaw * yaw_error
-        )
+        self.pulse_phase = "on"
 
-        self.last_vision_time = now
-
-    def desired_heading(self, target):
-        dx = target[0] - self.current_state[0]
-        dy = target[1] - self.current_state[1]
-        return math.atan2(dy, dx)
-
-    def update_dead_reckoning(self, linear, angular):
-        theta = self.current_state[2]
-
-        self.current_state[0] += (
-            linear * math.cos(theta) * self.dt
-        )
-        self.current_state[1] += (
-            linear * math.sin(theta) * self.dt
-        )
-        self.current_state[2] = wrap_angle(
-            self.current_state[2] + angular * self.dt
+        self.phase_until = (
+            now
+            + self.turn_pulse_s
         )
 
-    def stop_robot(self):
-        msg = Twist()
-        self.cmd_pub.publish(msg)
-        self.last_linear_cmd = 0.0
-        self.last_angular_cmd = 0.0
-
-    def record_waypoint(self, idx, target):
-        dx = target[0] - self.current_state[0]
-        dy = target[1] - self.current_state[1]
-        trans_error = math.hypot(dx, dy)
-
-        rot_error = abs(
-            wrap_angle(target[2] - self.current_state[2])
+        self.publish(
+            0.0,
+            self.pulse_sign
+            * self.turn_cmd,
         )
 
-        elapsed = time.monotonic() - self.start_monotonic
+        return False
 
-        self.waypoint_writer.writerow([
-            idx,
-            target[0],
-            target[1],
-            target[2],
-            self.current_state[0],
-            self.current_state[1],
-            self.current_state[2],
-            trans_error,
-            rot_error,
-            elapsed,
-        ])
-        self.waypoint_file.flush()
+    # ==========================================================
+    # Control
+    # ==========================================================
 
-        self.get_logger().info(
-            f"WAYPOINT {idx} reached: "
-            f"pose=({self.current_state[0]:.3f}, "
-            f"{self.current_state[1]:.3f}, "
-            f"{math.degrees(self.current_state[2]):.1f} deg), "
-            f"position_error={trans_error:.3f} m, "
-            f"rotation_error={math.degrees(rot_error):.1f} deg"
-        )
-
-    def control_loop(self):
+    def control(self):
         if not self.have_vision:
             self.stop_robot()
             return
 
-        if self.waypoint_idx >= len(self.waypoints):
+        if self.wp >= len(
+            self.points
+        ):
             self.stop_robot()
             return
 
-        target = self.waypoints[self.waypoint_idx]
+        (
+            _,
+            _,
+            nominal,
+            cross,
+            remaining,
+            endpoint_distance,
+        ) = self.segment_geometry()
 
-        dx = target[0] - self.current_state[0]
-        dy = target[1] - self.current_state[1]
-        distance = math.hypot(dx, dy)
+        desired_heading = (
+            self.desired_heading_for_segment(
+                nominal,
+                cross,
+            )
+        )
 
-        msg = Twist()
+        expected_tag = self.segment_tag[
+            self.wp
+        ]
 
-        # Once position is close enough, only correct final orientation.
-        if distance <= self.position_tolerance:
-            self.stage = "rotate_to_orientation"
+        # ------------------------------------------------------
+        # DRIVE
+        # ------------------------------------------------------
+        if self.stage == "drive":
 
-            yaw_error = wrap_angle(
-                target[2] - self.current_state[2]
+            # Never keep translating for a long interval without
+            # a recent visual position update.  The rectified image
+            # stream is intentionally treated as slow/intermittent.
+            allowed_age = (
+                self.max_near_drive_vision_age
+                if remaining < 0.30
+                else self.max_drive_vision_age
             )
 
-            if abs(yaw_error) <= self.angle_tolerance:
+            if self.vision_age() > allowed_age:
                 self.stop_robot()
-                reached_idx = self.waypoint_idx
-                self.record_waypoint(
-                    reached_idx, target
+
+                self.status(
+                    "Vision stale during translation: "
+                    f"age={self.vision_age():.1f}s, "
+                    f"limit={allowed_age:.1f}s. "
+                    "Holding still for fresh visual position."
                 )
 
-                if reached_idx >= self.stop_after:
-                    self.get_logger().info(
-                        f"Stopping after waypoint {reached_idx} as requested."
-                    )
-                    self.waypoint_idx = len(self.waypoints)
-                    self.stop_robot()
-                    return
-
-                self.waypoint_idx += 1
-
-                if self.waypoint_idx >= len(self.waypoints):
-                    self.get_logger().info(
-                        "All HW2 waypoints reached."
-                    )
-                    return
-
-                self.stage = "rotate_to_goal"
                 return
 
-            msg.angular.z = math.copysign(
-                self.rotate_speed, yaw_error
+            # Update yaw from stationary/slow visual observations
+            # only when physically plausible for this segment.
+            visual_yaw = self.stable_yaw_for_tag(
+                expected_tag,
+                nominal,
+                self.segment_yaw_gate,
             )
 
-        else:
-            desired = self.desired_heading(target)
-            heading_error = wrap_angle(
-                desired - self.current_state[2]
+            if visual_yaw is not None:
+                self.state[2] = visual_yaw
+
+            heading_error = wrap(
+                desired_heading
+                - self.state[2]
             )
 
-            # If badly misaligned, rotate in place first.
-            if abs(heading_error) > math.radians(20.0):
-                self.stage = "rotate_to_goal"
-                msg.angular.z = math.copysign(
-                    self.rotate_speed, heading_error
+            # Endpoint reached.
+            if (
+                endpoint_distance
+                <= self.endpoint_distance_tol
+                or remaining
+                <= self.endpoint_remaining_tol
+            ):
+                self.stop_robot()
+
+                if (
+                    self.vision_age()
+                    <= self.max_waypoint_vision_age
+                ):
+                    self.stage = "align_final"
+
+                    self.pulse_phase = "idle"
+
+                    self.get_logger().info(
+                        f"Waypoint {self.wp} position reached: "
+                        f"endpoint={endpoint_distance:.3f} m, "
+                        f"remaining={remaining:.3f} m, "
+                        f"cross={cross:.3f} m. "
+                        "Starting final orientation."
+                    )
+
+                else:
+                    self.status(
+                        "Near waypoint but vision is stale; "
+                        "holding still."
+                    )
+
+                return
+
+            # Accuracy-first:
+            # NEVER steer while translating.
+            #
+            # Stop if lateral or heading error is clearly outside
+            # the measurement-noise deadband.
+            need_cross_correction = (
+                abs(cross)
+                >= self.cross_track_correct
+            )
+
+            need_heading_correction = (
+                abs(heading_error)
+                >= self.heading_correct
+            )
+
+            if (
+                need_cross_correction
+                or need_heading_correction
+            ):
+                self.stop_robot()
+
+                self.stage = "align_segment"
+                self.pulse_phase = "idle"
+
+                self.get_logger().info(
+                    "Stopping for correction: "
+                    f"cross={cross:.3f} m, "
+                    f"heading_error="
+                    f"{math.degrees(heading_error):.1f} deg, "
+                    f"desired="
+                    f"{math.degrees(desired_heading):.1f} deg"
                 )
 
-            else:
-                self.stage = "drive"
+                return
 
-                linear = self.kp_distance * distance
-                linear = min(linear, self.max_linear)
+            speed = self.drive_speed
 
-                # Slow down as heading error grows.
-                linear *= max(
-                    0.35,
-                    math.cos(abs(heading_error))
-                )
+            if remaining < 0.25:
+                speed = self.near_speed
 
-                angular = (
-                    self.kp_heading_drive * heading_error
-                )
-                angular = max(
-                    -self.max_angular_drive,
-                    min(self.max_angular_drive, angular),
-                )
+            # Straight translation only.
+            self.publish(
+                speed,
+                0.0,
+            )
 
-                msg.linear.x = float(linear)
-                msg.angular.z = float(angular)
-
-        self.last_linear_cmd = msg.linear.x
-        self.last_angular_cmd = msg.angular.z
-
-        # Predict first; the next vision callback corrects this prediction.
-        self.update_dead_reckoning(
-            self.last_linear_cmd,
-            self.last_angular_cmd,
-        )
-
-        self.cmd_pub.publish(msg)
-
-    def log_state(self):
-        if not self.have_vision:
             return
 
-        elapsed = time.monotonic() - self.start_monotonic
+        # ------------------------------------------------------
+        # SEGMENT ALIGNMENT / CROSS-TRACK CORRECTION
+        # ------------------------------------------------------
+        if self.stage == "align_segment":
 
-        if self.waypoint_idx < len(self.waypoints):
-            target = self.waypoints[self.waypoint_idx]
-            target_idx = self.waypoint_idx
-        else:
-            target = self.waypoints[-1]
-            target_idx = len(self.waypoints)
+            done = self.update_turn_pulse(
+                desired_heading,
+                expected_tag=expected_tag,
+                visual_gate=math.radians(45.0),
+            )
 
-        if self.last_vision_time is None:
-            vision_age = float("inf")
-        else:
-            vision_age = (
-                self.get_clock().now()
-                - self.last_vision_time
-            ).nanoseconds / 1e9
+            if done:
+                self.stage = "drive"
 
-        self.trajectory_writer.writerow([
-            elapsed,
-            self.current_state[0],
-            self.current_state[1],
-            self.current_state[2],
-            target_idx,
-            target[0],
-            target[1],
-            target[2],
+                self.get_logger().info(
+                    "Segment heading corrected; "
+                    "resuming straight translation."
+                )
+
+            return
+
+        # ------------------------------------------------------
+        # FINAL WAYPOINT ORIENTATION
+        # ------------------------------------------------------
+        if self.stage == "align_final":
+
+            target_yaw = self.final_yaw[
+                self.wp
+            ]
+
+            # For final orientation, try the current segment's tag
+            # when it remains visible, but do not require it.
+            done = self.update_turn_pulse(
+                target_yaw,
+                expected_tag=expected_tag,
+                visual_gate=math.radians(45.0),
+            )
+
+            if not done:
+                return
+
+            target_pose = np.array([
+                self.points[self.wp][0],
+                self.points[self.wp][1],
+                target_yaw,
+            ])
+
+            reached = self.wp
+
+            self.record_waypoint(
+                reached,
+                target_pose,
+            )
+
+            if (
+                reached
+                >= self.stop_after
+            ):
+                self.get_logger().info(
+                    f"Stopping after waypoint "
+                    f"{reached}."
+                )
+
+                self.wp = len(
+                    self.points
+                )
+
+                self.stop_robot()
+                return
+
+            self.wp += 1
+
+            if self.wp >= len(
+                self.points
+            ):
+                self.get_logger().info(
+                    "All waypoints complete."
+                )
+
+                self.stop_robot()
+                return
+
+            # Before next translation, align to its nominal line.
+            self.stage = "align_segment"
+            self.pulse_phase = "idle"
+
+            self.get_logger().info(
+                f"Preparing segment {self.wp}: "
+                f"nominal heading="
+                f"{math.degrees(self.segment_heading[self.wp]):.1f} deg."
+            )
+
+    # ==========================================================
+    # Logging
+    # ==========================================================
+
+    def log_state(self):
+        if (
+            not self.have_vision
+            or self.wp <= 0
+            or self.wp >= len(self.points)
+        ):
+            return
+
+        (
+            _,
+            _,
+            nominal,
+            cross,
+            remaining,
+            _,
+        ) = self.segment_geometry()
+
+        desired = (
+            self.desired_heading_for_segment(
+                nominal,
+                cross,
+            )
+        )
+
+        self.traj.writerow([
+            time.monotonic()
+            - self.start_time,
+            self.state[0],
+            self.state[1],
+            self.state[2],
+            self.wp,
             self.stage,
-            self.last_linear_cmd,
-            self.last_angular_cmd,
-            vision_age,
-            self.last_tag_id,
+            cross,
+            remaining,
+            desired,
+            self.last_v,
+            self.last_w,
+            self.vision_age(),
+            self.last_tag,
+            self.pulse_phase,
         ])
-        self.trajectory_file.flush()
+
+        self.traj_f.flush()
 
     def destroy_node(self):
         try:
@@ -434,8 +1077,8 @@ class HW2Controller(Node):
             pass
 
         try:
-            self.trajectory_file.close()
-            self.waypoint_file.close()
+            self.traj_f.close()
+            self.wp_f.close()
         except Exception:
             pass
 
@@ -444,24 +1087,36 @@ class HW2Controller(Node):
 
 def main():
     parser = argparse.ArgumentParser()
+
     parser.add_argument(
         "--stop-after",
         type=int,
         default=3,
-        choices=[0, 1, 2, 3],
-        help="stop after reaching this waypoint index; 3 runs the full route",
+        choices=[
+            0,
+            1,
+            2,
+            3,
+        ],
     )
+
     args = parser.parse_args()
 
     rclpy.init()
-    node = HW2Controller(args.stop_after)
+
+    node = HW2Controller(
+        args.stop_after
+    )
 
     try:
         rclpy.spin(node)
+
     except KeyboardInterrupt:
         pass
+
     finally:
         node.destroy_node()
+
         if rclpy.ok():
             rclpy.shutdown()
 
