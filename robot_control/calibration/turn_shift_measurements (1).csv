@@ -1,5 +1,0 @@
-trial,direction,actual_angle_deg,commanded_angle_deg,duration_s,body_dx_m,body_dy_m,yaw_before_deg,yaw_after_deg,notes
-CP2_AFTER_LEFT_1,left,86.0,90,0.7,-0.034188,-0.111943,-3,83,Derived from successive measured full-route centers and yaws; turning-shift measurement; commanded duration inferred from existing dry-run; no robot pose sensor
-CP4_AFTER_RIGHT_1,right,-70.0,90,0.95,0.047442,-0.030809,78,8,Derived from successive measured full-route centers and yaws; turning-shift measurement; commanded duration inferred from existing dry-run; no robot pose sensor
-CP6_AFTER_LEFT_2,left,76.0,90,0.7,-0.02914,-0.056133,9,85,Derived from successive measured full-route centers and yaws; turning-shift measurement; commanded duration inferred from existing dry-run; no robot pose sensor
-CP8_AFTER_RIGHT_180,right,-174.0,180,2.13,-0.000907,-0.130381,86,-88,Derived from successive measured full-route centers and yaws; turning-shift measurement; commanded duration inferred from existing dry-run; no robot pose sensor

@@ -1,5 +1,0 @@
-test_id,segments_executed,target_x_m,target_y_m,target_theta_rad,observed_x_m,observed_y_m,observed_theta_rad,notes
-RT1,1,0.800,0.000,0.000,,,,Waypoint 0->1 autonomous run reported working; no numerical endpoint error measured/reported
-RT2,2,0.800,0.800,1.570,,,,Waypoints 0->1->2 autonomous run reported working; during the left turn an approximately 0.05-0.15 m unintended shift toward negative world y was visually estimated; actual endpoint pose and heading not measured; configuration includes painter tape near problematic right-rear wheel
-RT3_FULL,6,0.000,0.000,0.000,,,,Full six-segment motion executed; broad direction matches route but significant accumulated position error; first three segments appeared excessively left-biased; final endpoint not numerically measured; right-rear wheel/painter-tape issue remains unresolved
-RT3_WP4_PRE_FINAL_TURN,4,1.600,1.600,,,,,"During RT3, AFTER straight drive from file (2,1) toward (2,2) and BEFORE final turn, visually estimated near file (2,1.7) = scaled approximately (1.6,1.36)m; 0.24m y shortfall is approximate; cannot separate preceding turn shift from short drive/heading drift"

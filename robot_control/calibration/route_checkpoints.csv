@@ -1,9 +1,0 @@
-checkpoint,action,leg_from_zero_index,center_x_m,center_y_m,body_yaw_deg,world_dx_since_previous_m,world_dy_since_previous_m,body_dx_since_previous_m,body_dy_since_previous_m,measured_yaw_change_deg,notes
-CP1_AFTER_FORWARD_1,forward,1,0.7500,0.0000,-3,0.7500,0.0000,0.7500,0.0000,-3.00,"after original (0,0)->(1,0) forward; user called it waypoint 2"
-CP2_AFTER_LEFT_1,left,2,0.7100,-0.1100,83,-0.0400,-0.1100,-0.0342,-0.1119,86.00,"after left turn at (1,0); user said 7deg +x from +y"
-CP3_AFTER_FORWARD_2,forward,2,0.8700,0.6100,78,0.1600,0.7200,0.7341,-0.0711,-5.00,"after nominal forward toward (1,1); 12deg +x from +y"
-CP4_AFTER_RIGHT_1,right,3,0.9100,0.6500,8,0.0400,0.0400,0.0474,-0.0308,-70.00,"after right turn toward (2,1); 8deg +y from +x"
-CP5_AFTER_FORWARD_3,forward,3,1.5700,0.7200,9,0.6600,0.0700,0.6633,-0.0225,1.00,"after nominal forward toward (2,1); 9deg +y from +x"
-CP6_AFTER_LEFT_2,left,4,1.5500,0.6600,85,-0.0200,-0.0600,-0.0291,-0.0561,76.00,"after left turn toward (2,2); 5deg +x from +y"
-CP7_AFTER_FORWARD_4,forward,4,1.5800,1.3100,86,0.0300,0.6500,0.6501,0.0268,1.00,"after nominal forward toward (2,2); 4deg +x from +y"
-CP8_AFTER_RIGHT_180,right,4,1.7100,1.3000,-88,0.1300,-0.0100,-0.0009,-0.1304,-174.00,"after right turn ~180 at (2,2); 2deg +x from -y"
