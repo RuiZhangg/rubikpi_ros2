@@ -244,6 +244,28 @@ below the 9.21 gate. Robot-frame measurements remained near 0.907 m forward and
 TF direction, but it does not measure absolute bias or performance at long range
 and oblique views. Therefore it is not used alone to reduce `R`.
 
+The subsequent stationary range/angle survey produced the following accepted-
+sample statistics. Each run was centered independently per visible tag before
+pooling, so the table measures random repeatability rather than absolute bias.
+
+| Nominal pose | Visible IDs | Accepted samples | Pooled forward std. (m) | Pooled left std. (m) |
+|---|---|---:|---:|---:|
+| 0.75 m, front-on | 0 | 46 | 0.000093 | 0.000024 |
+| 1.50 m, front-on | 0, 1 | 1080 | 0.004801 | 0.003628 |
+| 2.25 m, front-on | 0, 1, 7 | 706 | 0.003457 | 0.002017 |
+| 1.50 m, +30 degrees | 0, 1 | 292 | 0.001342 | 0.000571 |
+| 1.50 m, -30 degrees | 0, 7 | 198 | 0.004222 | 0.003251 |
+| 1.50 m, +45 degrees | 1, 2 | 182 | 0.007608 | 0.004698 |
+| 1.50 m, -45 degrees | 7 | 108 | 0.000201 | 0.000104 |
+
+The largest individual-tag standard deviation occurred for tag 2 in the
+nominal +45-degree run: approximately 0.00955 m forward and 0.00630 m left.
+The strong variation by tag/view and correlated covariance in several runs
+support retaining a conservative, range-dependent `R`. TODO[CALIBRATION]: Add
+rejection rates and tape-measured pose errors from the raw CSVs, then select the
+final numerical model. A candidate model for moving trials is
+`sigma(r)=0.010+0.005r` m, but it is not yet the final report value.
+
 ### 3.9 First observation of a new landmark
 
 For a new ID, the landmark is initialized by transforming its robot-frame
