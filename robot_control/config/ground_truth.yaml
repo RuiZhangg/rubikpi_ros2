@@ -1,0 +1,24 @@
+# Evaluation-only template. The online SLAM and controller nodes never load it.
+arena:
+  nominal_side_m: 3.302
+  measured_wall_lengths_m:
+    south: null
+    east: null
+    north: null
+    west: null
+
+world_frame:
+  description: origin at the measured southwest arena corner, x east, y north
+  robot_start_pose: [null, null, null]
+
+# Fill exact tag-center coordinates after mounting. Suggested ID/wall assignment
+# is documented in docs/arena_setup.md.
+tags:
+  0: {wall: south, x: null, y: null, z: null}
+  1: {wall: south, x: null, y: null, z: null}
+  2: {wall: east, x: null, y: null, z: null}
+  3: {wall: east, x: null, y: null, z: null}
+  4: {wall: north, x: null, y: null, z: null}
+  5: {wall: north, x: null, y: null, z: null}
+  6: {wall: west, x: null, y: null, z: null}
+  7: {wall: west, x: null, y: null, z: null}

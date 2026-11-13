@@ -16,17 +16,17 @@ being missed. Check a box only after evidence has been collected.
 
 ## Online algorithm
 
-- [ ] Use a Kalman-filter-based SLAM system; an EKF is the selected design.
-- [ ] Define state vector `x` and measurement vector `z`.
-- [ ] Derive and report system Jacobian `F`, control Jacobian `G`, and
+- [x] Use a Kalman-filter-based SLAM system; an EKF is the selected design.
+- [x] Define state vector `x` and measurement vector `z`.
+- [x] Derive and report system Jacobian `F`, control Jacobian `G`, and
   measurement Jacobian `H`.
-- [ ] Define initial state and covariance.
+- [x] Define initial state and covariance.
 - [ ] Explain how process noise `Q` and measurement noise `R` were measured.
-- [ ] Dynamically add a tag on its first observation. The filter must not
+- [x] Dynamically add a tag on its first observation. The filter must not
   preallocate or assume eight landmarks.
-- [ ] Explain behavior when a landmark leaves the field of view.
-- [ ] Explain behavior when a previously mapped landmark reappears.
-- [ ] Use the current SLAM pose to correct trajectory drift.
+- [x] Explain behavior when a landmark leaves the field of view.
+- [x] Explain behavior when a previously mapped landmark reappears.
+- [x] Use the current SLAM pose to correct trajectory drift.
 
 ## Required experiments
 

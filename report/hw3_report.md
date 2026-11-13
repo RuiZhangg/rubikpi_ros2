@@ -259,6 +259,25 @@ correction updates the robot, that landmark, and correlated landmarks. This is
 the mechanism that produces loop closure and should reduce uncertainty on later
 laps.
 
+### 3.12 Implementation and pre-arena verification
+
+The mathematical filter is isolated in
+`robot_control/robot_control/ekf_slam.py`; it has no ROS dependency. The ROS
+wrapper in `hw3_slam_node.py` time-matches AprilTag detections with
+`base_link -> tag` transforms, applies detector-quality and innovation gates,
+and logs every prediction, accepted update, rejection, state, and marginal
+covariance. The controller is implemented separately in `hw3_controller.py`, so
+the estimator does not contain path-specific logic.
+
+Before arena testing, automated tests numerically differentiated the motion and
+measurement functions and matched the analytic \(F\), \(G\), and \(H\)
+Jacobians. Tests also checked dynamic state augmentation, nonzero
+cross-covariance, stationary landmark prediction, outlier rejection, covariance
+symmetry/positive semidefiniteness, square/octagon closure, and a synthetic
+square loop with biased motion. At the pre-arena implementation checkpoint, all
+11 offline tests passed with Python warnings treated as errors. TODO[RESULT]:
+Replace this count with the final submission-commit test result if it changes.
+
 ## 4. Closed-loop trajectory strategy
 
 ### 4.1 Stop-observe-update motion
@@ -283,10 +302,13 @@ with the square trajectory.
 
 ### 4.4 No-fresh-observation behavior
 
-The default controller stops when a completed primitive is not followed by a
-fresh accepted observation before the timeout. It does not silently continue
-open loop. TODO[RESULT]: Describe any recovery/search behavior used in the final
-arena run.
+The controller stops when a completed primitive is not followed by a fresh
+accepted observation before the timeout. After translation it remains stopped;
+blind translation is disabled. If a tag leaves view during an intended turn, it
+may continue calibrated turn pulses only toward that same target yaw while
+searching for the next tag. It stops at the target heading if no observation has
+appeared. TODO[RESULT]: Describe the recovery/search behavior actually exercised
+in the final arena run.
 
 ## 5. Results
 

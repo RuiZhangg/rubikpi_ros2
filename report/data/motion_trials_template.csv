@@ -1,0 +1,4 @@
+commanded_distance_m,actual_distance_m,commanded_delta_yaw_rad,actual_delta_yaw_rad,notes
+0.05,,0.0,,straight trial 1
+0.0,,0.0523598776,,left pulse trial 1
+0.0,,-0.0523598776,,right pulse trial 1

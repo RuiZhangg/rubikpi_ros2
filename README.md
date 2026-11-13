@@ -31,3 +31,16 @@ by the online SLAM node.
 
 See `docs/runtime.md` for deployment and commands. See
 `docs/hw3_requirements.md` for the handout-to-report checklist.
+
+## Offline verification
+
+The estimator and path geometry can be tested without ROS or the rover:
+
+```bash
+PYTHONPATH=robot_control python3 -m unittest discover \
+  -s robot_control/test -v
+```
+
+Final-run plots and error metrics are generated with
+`tools/analyze_hw3_run.py`. Analysis-only Python requirements are listed in
+`tools/requirements-analysis.txt`.
