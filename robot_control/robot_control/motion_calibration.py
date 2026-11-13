@@ -171,6 +171,13 @@ class MotionCalibrationNode(Node):
         self.complete = True
         self.get_logger().error(reason)
 
+    @staticmethod
+    def sample_counts(samples_by_tag):
+        return {
+            int(tag_id): len(samples)
+            for tag_id, samples in sorted(samples_by_tag.items())
+        }
+
     def start_motion(self, now):
         self.phase = "moving"
         self.motion_start = now
@@ -300,7 +307,9 @@ class MotionCalibrationNode(Node):
                 self.fail(
                     f"Timed out in {self.phase}; need "
                     f"{self.arguments.minimum_common_tags} common tags with "
-                    f"{self.arguments.minimum_samples_per_tag} samples each"
+                    f"{self.arguments.minimum_samples_per_tag} samples each; "
+                    f"before counts={self.sample_counts(self.before_samples)}, "
+                    f"after counts={self.sample_counts(self.after_samples)}"
                 )
             return
 
@@ -333,8 +342,8 @@ def parse_arguments(args=None):
     parser.add_argument("--turn-pulse-s", type=float, default=0.10)
     parser.add_argument("--turn-increment-rad", type=float, default=math.radians(3.0))
     parser.add_argument("--settle-s", type=float, default=0.75)
-    parser.add_argument("--collection-s", type=float, default=5.0)
-    parser.add_argument("--minimum-samples-per-tag", type=int, default=30)
+    parser.add_argument("--collection-s", type=float, default=3.0)
+    parser.add_argument("--minimum-samples-per-tag", type=int, default=10)
     parser.add_argument("--minimum-common-tags", type=int, default=2)
     parser.add_argument("--minimum-baseline-m", type=float, default=0.30)
     parser.add_argument("--max-observation-wait-s", type=float, default=30.0)

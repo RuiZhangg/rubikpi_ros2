@@ -135,7 +135,7 @@ Return the rover approximately to the same clear, tag-visible area before each
 invocation; exact manual placement is unnecessary because every trial uses its
 own before/after measurements. Do not run another motor controller or
 autonomous controller concurrently. The command refuses to move if it cannot
-collect at least 30 samples from each of two tags within 30 seconds. After
+collect at least 10 samples from each of two tags within 30 seconds. After
 motion it repeats the check, estimates forward/left displacement and yaw,
 prints JSON with bootstrap standard deviations and fit residuals, and appends:
 
@@ -153,9 +153,9 @@ primitive traveled 0.05165 m and showed -0.472 degrees yaw; the left pulse
 produced +1.549 degrees and the right pulse -2.583 degrees. Fit RMSE was at most
 0.00219 m and the common-tag baseline was about 1.128 m. The directional turn
 asymmetry must be estimated from repeated groups rather than pooled with straight
-trials. Defaults were increased from 10 to 30 samples per tag and from 3 to 5
-seconds of collection after the pilot because straight-trial yaw uncertainty was
-0.308 degrees.
+trials. The straight-trial yaw uncertainty was 0.308 degrees, so repeated trials
+are used to reduce uncertainty; requiring 30 samples per tag proved unreliable
+under intermittent two-tag visibility and was rejected.
 
 As a no-motion validation, four existing stationary two-tag logs were divided
 into early and late windows and passed through the same estimator. Apparent

@@ -90,6 +90,7 @@ All signs and geometry checks passed. The rover traveled about 3.3% farther
 than commanded in the straight pilot. More importantly, the same 0.10 s pulse
 produced only about 52% of the nominal left increment but 86% of the nominal
 right increment. No controller value is changed from one trial; collect 20
-trials per primitive and calibrate left/right prediction separately. Collection
-defaults were raised to 30 samples per tag and 5 seconds to reduce the borderline
-straight yaw uncertainty.
+trials per primitive and calibrate left/right prediction separately. A later
+30-sample requirement timed out under intermittent two-tag visibility before
+motion and was rejected. The safe default remains 10 samples per tag over at
+least 3 seconds; repeated trials reduce the borderline straight-yaw uncertainty.
