@@ -54,6 +54,9 @@ class MotionCalibrationNode(Node):
         self.pending = deque()
         self.before_samples = defaultdict(list)
         self.after_samples = defaultdict(list)
+        self.statistics = defaultdict(int)
+        self.last_tf_error = "none"
+        self.last_status_time = 0.0
         self.phase = "collect_before"
         self.phase_start = time.monotonic()
         self.motion_start = None
@@ -86,6 +89,8 @@ class MotionCalibrationNode(Node):
     def on_detections(self, message):
         if self.phase not in ("collect_before", "collect_after"):
             return
+        self.statistics["detection_arrays"] += 1
+        self.statistics["detections"] += len(message.detections)
         stamp = Time.from_msg(message.header.stamp)
         received = time.monotonic()
         for detection in message.detections:
@@ -116,8 +121,10 @@ class MotionCalibrationNode(Node):
             pending = self.pending.popleft()
             age = time.monotonic() - pending.received_monotonic
             if pending.hamming > self.arguments.max_hamming:
+                self.statistics["hamming_rejections"] += 1
                 continue
             if pending.decision_margin < self.arguments.min_decision_margin:
+                self.statistics["margin_rejections"] += 1
                 continue
             try:
                 transform = self.tf_buffer.lookup_transform(
@@ -126,11 +133,14 @@ class MotionCalibrationNode(Node):
                     pending.stamp,
                     timeout=Duration(seconds=self.arguments.tf_timeout_s),
                 )
-            except Exception:
+            except Exception as error:
+                self.statistics["tf_failures"] += 1
+                self.last_tf_error = str(error)
                 if age < self.arguments.max_pending_age_s:
                     self.pending.append(pending)
                 continue
             translation = transform.transform.translation
+            self.statistics["tf_samples"] += 1
             destination[pending.tag_id].append(
                 np.array([translation.x, translation.y], dtype=float)
             )
@@ -177,6 +187,21 @@ class MotionCalibrationNode(Node):
             int(tag_id): len(samples)
             for tag_id, samples in sorted(samples_by_tag.items())
         }
+
+    def diagnostic_status(self):
+        return (
+            f"phase={self.phase}, detection_publishers="
+            f"{self.count_publishers('/detections')}, "
+            f"arrays={self.statistics['detection_arrays']}, "
+            f"detections={self.statistics['detections']}, "
+            f"tf_samples={self.statistics['tf_samples']}, "
+            f"tf_failures={self.statistics['tf_failures']}, "
+            f"hamming_rejections={self.statistics['hamming_rejections']}, "
+            f"margin_rejections={self.statistics['margin_rejections']}, "
+            f"before={self.sample_counts(self.before_samples)}, "
+            f"after={self.sample_counts(self.after_samples)}, "
+            f"last_tf_error={self.last_tf_error}"
+        )
 
     def start_motion(self, now):
         self.phase = "moving"
@@ -292,6 +317,9 @@ class MotionCalibrationNode(Node):
         if self.phase in ("collect_before", "collect_after"):
             self.publish_command(0.0, 0.0)
             self.process_pending()
+            if now - self.last_status_time >= 2.0:
+                self.last_status_time = now
+                self.get_logger().info(self.diagnostic_status())
             elapsed = now - self.phase_start
             ready = (
                 self.sufficiently_sampled_before()
@@ -308,8 +336,7 @@ class MotionCalibrationNode(Node):
                     f"Timed out in {self.phase}; need "
                     f"{self.arguments.minimum_common_tags} common tags with "
                     f"{self.arguments.minimum_samples_per_tag} samples each; "
-                    f"before counts={self.sample_counts(self.before_samples)}, "
-                    f"after counts={self.sample_counts(self.after_samples)}"
+                    f"diagnostics: {self.diagnostic_status()}"
                 )
             return
 
@@ -346,7 +373,7 @@ def parse_arguments(args=None):
     parser.add_argument("--minimum-samples-per-tag", type=int, default=10)
     parser.add_argument("--minimum-common-tags", type=int, default=2)
     parser.add_argument("--minimum-baseline-m", type=float, default=0.30)
-    parser.add_argument("--max-observation-wait-s", type=float, default=30.0)
+    parser.add_argument("--max-observation-wait-s", type=float, default=60.0)
     parser.add_argument("--bootstrap-resamples", type=int, default=300)
     parser.add_argument("--max-hamming", type=int, default=1)
     parser.add_argument("--min-decision-margin", type=float, default=20.0)

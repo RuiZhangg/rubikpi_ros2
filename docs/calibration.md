@@ -113,29 +113,30 @@ transform from the after frame to the before frame, bootstraps uncertainty, and
 appends a CSV row compatible with `tools/estimate_noise.py motion`.
 
 Place the rover where at least two well-separated tags remain visible through a
-5 cm displacement and a small turn. Start perception, TF, and motor support
-without the SLAM node or autonomous controller:
+5 cm displacement and a small turn. Stop any existing camera, bringup, motor,
+or calibration processes, then use the single calibration launch command. It
+starts perception, TF, and motor support without SLAM or autonomous control,
+delays calibration for camera startup, and shuts the whole stack down when the
+trial finishes:
 
 ```bash
-ros2 launch robot_control hw3_bringup.launch.py \
-  run_slam:=false \
-  run_controller:=false \
-  run_name:=motion_calibration_support
+ros2 launch robot_control motion_calibration.launch.py \
+  kind:=straight \
+  trial_id:=straight_02
 ```
 
-From a second sourced terminal, execute exactly one supervised primitive:
-
-```bash
-ros2 run robot_control motion_calibration straight --trial-id straight_01
-ros2 run robot_control motion_calibration left --trial-id left_01
-ros2 run robot_control motion_calibration right --trial-id right_01
-```
+Change `kind` and `trial_id` for left and right trials. Live diagnostics print
+every two seconds: detection publisher count, received arrays/detections,
+successful and failed TF lookups, quality rejections, per-tag sample counts, and
+the last TF error. A zero publisher/array count is a perception-stack problem;
+detections with zero TF samples are a frame/timestamp problem. Increasing the
+timeout cannot repair either condition.
 
 Return the rover approximately to the same clear, tag-visible area before each
 invocation; exact manual placement is unnecessary because every trial uses its
 own before/after measurements. Do not run another motor controller or
 autonomous controller concurrently. The command refuses to move if it cannot
-collect at least 10 samples from each of two tags within 30 seconds. After
+collect at least 10 samples from each of two tags within 60 seconds. After
 motion it repeats the check, estimates forward/left displacement and yaw,
 prints JSON with bootstrap standard deviations and fit residuals, and appends:
 

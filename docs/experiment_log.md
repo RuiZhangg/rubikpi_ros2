@@ -94,3 +94,11 @@ trials per primitive and calibrate left/right prediction separately. A later
 30-sample requirement timed out under intermittent two-tag visibility before
 motion and was rejected. The safe default remains 10 samples per tag over at
 least 3 seconds; repeated trials reduce the borderline straight-yaw uncertainty.
+
+A subsequent 10-sample attempt also timed out with empty successful-sample
+counts. Because lowering the threshold cannot repair zero input, the node now
+prints live `/detections` publisher/message counters, TF success/failure counts,
+quality rejections, per-tag counts, and the last TF exception. A dedicated
+`motion_calibration.launch.py` starts the complete support stack and calibration
+in one command, removing the most likely missing-process failure mode. The
+observation wait was extended to 60 seconds for genuinely slow but nonzero data.
