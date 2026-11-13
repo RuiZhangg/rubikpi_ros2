@@ -102,3 +102,18 @@ quality rejections, per-tag counts, and the last TF exception. A dedicated
 `motion_calibration.launch.py` starts the complete support stack and calibration
 in one command, removing the most likely missing-process failure mode. The
 observation wait was extended to 60 seconds for genuinely slow but nonzero data.
+
+## 2026-11-13 - completed motion calibration
+
+Six accepted trials were collected for each primitive. Straight motion averaged
+0.06830 m with 0.01096 m standard deviation for a nominal 0.05 m command. Left
+pulses averaged +0.02020 rad with 0.01147 rad standard deviation; right pulses
+averaged -0.02262 rad with 0.01725 rad standard deviation. This confirms severe
+directional and trial-to-trial turn variation.
+
+The motor commands remain unchanged. The closed-loop controller now predicts
+translation with scale 1.3659, predicts left and right pulses separately, uses a
+2-degree heading tolerance, requires two initialized landmarks before starting,
+and disables all blind turn pulses. Existing conservative process noise is kept
+because it exceeds the measured motion scatter and lets landmark observations
+correct each stopped primitive.

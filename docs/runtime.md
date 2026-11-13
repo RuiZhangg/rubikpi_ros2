@@ -221,15 +221,15 @@ results.
 
 ## Expected behavior
 
-- The controller does not move until at least one tag has initialized the map.
-- Translation occurs in approximately 5 cm increments.
+- The controller does not move until at least two tags have initialized the map.
+- The unchanged motor command is predicted from calibration: a nominal 5 cm
+  timing command produced 6.83 cm mean motion, with landmark correction after
+  every primitive.
 - Turns use the successful HW2 settings: angular command 0.002 for 0.10 s, with
-  a predicted increment near 3 degrees.
+  measured predictions of about +1.16 degrees left and -1.30 degrees right.
 - After every primitive the rover stops and waits for a new accepted tag update.
-- If a tag leaves view during a commanded turn, the controller may continue
-  calibrated turn pulses toward that same target yaw to search for the next tag.
-  Blind translation is never allowed; it holds still if no update arrives after
-  translation or after reaching the intended turn heading.
+- Blind translation and blind turn pulses are disabled. If no accepted landmark
+  update arrives, the rover remains stopped indefinitely.
 - Logs are written under `~/hw3_logs/<run_name>/`.
 
 ## Recommended staged tests

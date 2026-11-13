@@ -212,7 +212,10 @@ robot covariance fixes this otherwise unobservable global translation and
 rotation gauge. The landmark map is empty, so the initial state has three
 elements and the initial covariance is 3 by 3.
 
-TODO[CALIBRATION]: State the final numerical initial covariance and justify it.
+The configured initial covariance is
+`diag(10^-8,10^-8,10^-8)`. These small nonzero values fix the arbitrary local
+SLAM gauge without claiming knowledge of the robot's world pose; the measured
+world start pose is used only by offline evaluation.
 
 ### 3.7 Process noise \(Q\) / control noise \(M\)
 
@@ -242,8 +245,16 @@ with approximately 1.128 m baseline and at most 0.00219 m fit RMSE. The strong
 directional asymmetry motivates separate left/right calibration; final process
 noise values require the repeated trials.
 
-TODO[CALIBRATION]: Report trial count, raw-error plots, sample covariance, and
-the final numerical values used.
+Six trials of each primitive were collected. Nominal 0.05 m translations had
+mean 0.06830 m and standard deviation 0.01096 m. Left pulses had mean 0.02020
+rad and standard deviation 0.01147 rad; right pulses had mean -0.02262 rad and
+standard deviation 0.01725 rad. The controller therefore predicts translation
+with scale 1.3659 and uses separate left/right increments. Because individual
+motions remain highly variable, the deliberately conservative control-noise
+standard deviations remain
+`sigma_d=0.015+0.15|delta_s|` m and
+`sigma_theta=0.04+0.25|delta_theta|` rad. These exceed the measured scatter and
+allow fresh landmark updates to dominate. Blind turn pulses are disabled.
 
 ### 3.8 Measurement noise \(R\)
 
@@ -251,9 +262,6 @@ Measurement noise is measured with a stationary robot observing tags at several
 ranges and view angles after image rectification. The baseline implementation
 allows standard deviation to grow with range because distant tags occupy fewer
 pixels and produced larger HW2 pose errors.
-
-TODO[CALIBRATION]: Report sample counts, tested ranges/angles, covariance, and
-the final range-dependent model.
 
 A preliminary stationary checkpoint placed tag 0 nearly front-on at an observed
 range of approximately 0.934 m. Detections had hamming distance 0 and decision
@@ -376,11 +384,11 @@ tag visibility, and comparability with the square trajectory.
 
 The controller stops when a completed primitive is not followed by a fresh
 accepted observation before the timeout. After translation it remains stopped;
-blind translation is disabled. If a tag leaves view during an intended turn, it
-may continue calibrated turn pulses only toward that same target yaw while
-searching for the next tag. It stops at the target heading if no observation has
-appeared. TODO[RESULT]: Describe the recovery/search behavior actually exercised
-in the final arena run.
+blind translation and blind turn pulses are disabled. It also requires at least
+two initialized landmarks before starting. Direction-specific mean turn
+increments are used only for prediction; after every 0.10 s pulse, a fresh
+landmark update determines whether another pulse is needed. TODO[RESULT]:
+Describe the recovery behavior actually exercised in the final arena run.
 
 ## 5. Results
 

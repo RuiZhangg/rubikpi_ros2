@@ -3,6 +3,7 @@
 """Stop-observe-update closed-loop square/octagon controller for HW3."""
 
 import csv
+import json
 import math
 import os
 import time
@@ -11,7 +12,7 @@ import numpy as np
 import rclpy
 from geometry_msgs.msg import PoseWithCovarianceStamped, Twist, Vector3
 from rclpy.node import Node
-from std_msgs.msg import UInt64
+from std_msgs.msg import String, UInt64
 
 from robot_control.ekf_slam import wrap_angle
 from robot_control.trajectory import build_waypoints
@@ -33,14 +34,17 @@ class HW3Controller(Node):
         self.declare_parameter("laps", 1)
         self.declare_parameter("step_distance_m", 0.05)
         self.declare_parameter("drive_speed_mps", 0.04)
+        self.declare_parameter("translation_distance_scale", 1.0)
         self.declare_parameter("turn_command", 0.002)
         self.declare_parameter("turn_pulse_s", 0.10)
-        self.declare_parameter("turn_increment_rad", math.radians(3.0))
-        self.declare_parameter("turn_tolerance_rad", math.radians(3.5))
+        self.declare_parameter("left_turn_increment_rad", math.radians(3.0))
+        self.declare_parameter("right_turn_increment_rad", math.radians(3.0))
+        self.declare_parameter("turn_tolerance_rad", math.radians(2.0))
         self.declare_parameter("waypoint_tolerance_m", 0.07)
         self.declare_parameter("observation_timeout_s", 6.0)
         self.declare_parameter("max_blind_turn_pulses", 30)
         self.declare_parameter("start_delay_s", 3.0)
+        self.declare_parameter("minimum_landmarks_to_start", 2)
         self.declare_parameter("log_root", "~/hw3_logs")
         self.declare_parameter("run_name", "")
 
@@ -51,10 +55,16 @@ class HW3Controller(Node):
             self.get_parameter("step_distance_m").value
         )
         self.drive_speed_mps = float(self.get_parameter("drive_speed_mps").value)
+        self.translation_distance_scale = float(
+            self.get_parameter("translation_distance_scale").value
+        )
         self.turn_command = float(self.get_parameter("turn_command").value)
         self.turn_pulse_s = float(self.get_parameter("turn_pulse_s").value)
-        self.turn_increment_rad = float(
-            self.get_parameter("turn_increment_rad").value
+        self.left_turn_increment_rad = float(
+            self.get_parameter("left_turn_increment_rad").value
+        )
+        self.right_turn_increment_rad = float(
+            self.get_parameter("right_turn_increment_rad").value
         )
         self.turn_tolerance_rad = float(
             self.get_parameter("turn_tolerance_rad").value
@@ -69,6 +79,9 @@ class HW3Controller(Node):
             self.get_parameter("max_blind_turn_pulses").value
         )
         self.start_delay_s = float(self.get_parameter("start_delay_s").value)
+        self.minimum_landmarks_to_start = int(
+            self.get_parameter("minimum_landmarks_to_start").value
+        )
 
         self.waypoints = build_waypoints(
             self.shape, self.side_length_m, self.laps
@@ -76,6 +89,7 @@ class HW3Controller(Node):
         self.target_index = 1
         self.pose = None
         self.update_count = 0
+        self.landmark_count = 0
         self.mode = "waiting_for_map"
         self.start_monotonic = time.monotonic()
         self.motion_deadline = 0.0
@@ -105,6 +119,7 @@ class HW3Controller(Node):
             self.on_update_count,
             10,
         )
+        self.create_subscription(String, "/hw3/slam_map", self.on_map, 10)
         self.create_timer(0.05, self.control)
 
         self.event_file = self._open_event_log()
@@ -157,6 +172,13 @@ class HW3Controller(Node):
 
     def on_update_count(self, message):
         self.update_count = int(message.data)
+
+    def on_map(self, message):
+        try:
+            snapshot = json.loads(message.data)
+            self.landmark_count = len(snapshot.get("landmarks", {}))
+        except (TypeError, ValueError):
+            self.get_logger().warn("Ignored malformed /hw3/slam_map message")
 
     def publish_command(self, linear, angular):
         message = Twist()
@@ -232,10 +254,15 @@ class HW3Controller(Node):
         if (
             self.pose is None
             or self.update_count < 1
+            or self.landmark_count < self.minimum_landmarks_to_start
             or now - self.start_monotonic < self.start_delay_s
         ):
             self.stop_robot()
-            self._status("Waiting for the first accepted landmark observation.")
+            self._status(
+                "Waiting for accepted observations from at least "
+                f"{self.minimum_landmarks_to_start} mapped landmarks; "
+                f"currently mapped={self.landmark_count}."
+            )
             return
 
         if self.mode == "waiting_for_map":
@@ -282,12 +309,17 @@ class HW3Controller(Node):
             self.drive_speed_mps,
             0.0,
             duration,
-            step,
+            step * self.translation_distance_scale,
             0.0,
         )
 
     def _start_turn(self, heading_error, preserve_target=False):
         direction = 1.0 if heading_error > 0.0 else -1.0
+        predicted_increment = (
+            self.left_turn_increment_rad
+            if direction > 0.0
+            else self.right_turn_increment_rad
+        )
         if not preserve_target:
             self.turn_target_yaw = wrap_angle(self.pose[2] + heading_error)
         self._start_motion(
@@ -295,7 +327,7 @@ class HW3Controller(Node):
             direction * self.turn_command,
             self.turn_pulse_s,
             0.0,
-            direction * self.turn_increment_rad,
+            direction * predicted_increment,
         )
 
     def _status(self, text):

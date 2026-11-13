@@ -31,16 +31,21 @@ hw3_controller:
     laps: 1
     step_distance_m: 0.05
     drive_speed_mps: 0.04
+    # Six landmark-estimated trials: 0.06830 m mean per nominal 0.05 m command.
+    translation_distance_scale: 1.3659095391112453
 
-    # Values retained from the successful HW2 stop-and-turn strategy.
+    # Preserve the safe small HW2 pulse, but predict measured direction-specific
+    # mean rotation. A fresh landmark update is mandatory after every pulse.
     turn_command: 0.002
     turn_pulse_s: 0.10
-    turn_increment_rad: 0.05235987755982989
-    turn_tolerance_rad: 0.061086523819801536
+    left_turn_increment_rad: 0.02020035352985965
+    right_turn_increment_rad: 0.02261615748165217
+    turn_tolerance_rad: 0.03490658503988659
 
     waypoint_tolerance_m: 0.07
-    observation_timeout_s: 6.0
-    max_blind_turn_pulses: 30
+    observation_timeout_s: 8.0
+    max_blind_turn_pulses: 0
     start_delay_s: 3.0
+    minimum_landmarks_to_start: 2
     log_root: ~/hw3_logs
     run_name: ""
