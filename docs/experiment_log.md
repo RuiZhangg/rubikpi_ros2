@@ -64,10 +64,13 @@ noise model, `sigma(r)=0.025+0.015r` m, is substantially larger than observed
 random scatter. This is safe but may underweight the primary sensor relative to
 command-only motion prediction.
 
-No parameter is changed yet. The pasted summaries contain accepted samples only
-and do not provide rejection rates, and nominal run names are not sufficiently
-precise ground truth for estimating systematic bias. Preserve the eight raw
-observation CSVs so acceptance rate, NIS distribution, actual range, and bias
-can be audited before selecting the final model. A provisional moving-test
-candidate is `sigma(r)=0.010+0.005r` m, which remains above the observed random
-scatter across the tested range.
+The copied raw logs contained 4,487 observations, all accepted. Observation
+rates varied from 1.37 to 11.17 Hz by run. The maximum recorded NIS under the
+original model was 0.521. Offline replay through a fresh EKF accepted all 4,487
+samples with `sigma(r)=0.010+0.005r`; NIS p95, p99, and maximum were 0.228,
+0.489, and 3.858. An aggressive `0.005+0.003r` model rejected 275 samples and
+was rejected as overconfident.
+
+The configured measurement model is now `sigma(r)=0.010+0.005r` m. Exact
+ground-truth map error will still capture systematic bias that cannot be inferred
+from within-run scatter.

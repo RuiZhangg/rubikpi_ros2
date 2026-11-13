@@ -51,6 +51,40 @@ front-on checkpoint. Collect at least 60 seconds and 30 accepted observations
 per run. Measure range from the `base_link` origin, record how yaw was measured,
 and do not infer absolute accuracy from within-run scatter alone.
 
+### Selected measurement model
+
+The eight completed stationary runs contained 4,487 observations with no
+quality or innovation rejection. The worst individual-tag standard deviation
+was approximately 0.00955 m forward and 0.00630 m left. Replaying every raw
+measurement through a fresh stationary EKF produced:
+
+| Model | Accepted | Rejected | NIS p95 | NIS p99 | Maximum NIS |
+|---|---:|---:|---:|---:|---:|
+| `0.025+0.015r` | 4487 | 0 | 0.030 | 0.065 | 0.521 |
+| `0.010+0.005r` | 4487 | 0 | 0.228 | 0.489 | 3.858 |
+| `0.005+0.003r` | 4212 | 275 | 11.359 | 11.805 | 13.035 |
+
+The selected model is therefore
+
+```text
+sigma(r) = 0.010 + 0.005 r meters.
+```
+
+It gives vision more weight than the original deliberately conservative model,
+stays above measured random scatter, and preserves margin below the 2-D 99%
+chi-square gate of 9.21. Revisit it only if controlled moving tests show that
+unmodeled motion or systematic viewing bias causes plausible observations to be
+rejected.
+
+The replay is reproducible with:
+
+```bash
+python3 tools/replay_measurement_noise.py \
+  runtime/logs/measurement_calibration/*/observations.csv \
+  --sigma-base 0.010 \
+  --sigma-per-meter 0.005
+```
+
 ## Motion noise M (mapped to Q through G)
 
 Use `report/data/motion_trials_template.csv` as the schema. For translation,

@@ -261,10 +261,20 @@ pooling, so the table measures random repeatability rather than absolute bias.
 The largest individual-tag standard deviation occurred for tag 2 in the
 nominal +45-degree run: approximately 0.00955 m forward and 0.00630 m left.
 The strong variation by tag/view and correlated covariance in several runs
-support retaining a conservative, range-dependent `R`. TODO[CALIBRATION]: Add
-rejection rates and tape-measured pose errors from the raw CSVs, then select the
-final numerical model. A candidate model for moving trials is
-`sigma(r)=0.010+0.005r` m, but it is not yet the final report value.
+supports a conservative, range-dependent `R`. Across the raw logs, all 4,487
+observations were accepted. Replaying every observation through a fresh EKF
+with the selected
+
+\[
+\sigma_z(r)=0.010+0.005r\ \text{m}
+\]
+
+model again accepted all 4,487 samples; NIS p95, p99, and maximum were 0.228,
+0.489, and 3.858, respectively. A more aggressive
+`sigma(r)=0.005+0.003r` model rejected 275 samples, so it was judged
+overconfident. The selected diagonal measurement covariance is
+`R=diag(sigma_z(r)^2,sigma_z(r)^2)`. Systematic bias is evaluated separately
+against the measured ground-truth landmark map.
 
 ### 3.9 First observation of a new landmark
 
@@ -310,9 +320,9 @@ Before arena testing, automated tests numerically differentiated the motion and
 measurement functions and matched the analytic \(F\), \(G\), and \(H\)
 Jacobians. Tests also checked dynamic state augmentation, nonzero
 cross-covariance, stationary landmark prediction, outlier rejection, covariance
-symmetry/positive semidefiniteness, square/octagon closure, and a synthetic
-square loop with biased motion. At the pre-arena implementation checkpoint, all
-11 offline tests passed with Python warnings treated as errors. TODO[RESULT]:
+symmetry/positive semidefiniteness, square/octagon closure, measurement-noise
+replay, and a synthetic square loop with biased motion. At the measurement-noise
+checkpoint, all 12 offline tests passed with Python warnings treated as errors. TODO[RESULT]:
 Replace this count with the final submission-commit test result if it changes.
 
 ## 4. Closed-loop trajectory strategy
