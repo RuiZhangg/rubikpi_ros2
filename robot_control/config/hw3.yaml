@@ -48,6 +48,6 @@ hw3_controller:
     # existing target, stopping after each. Translation is never blind.
     max_blind_turn_pulses: 5
     start_delay_s: 3.0
-    minimum_landmarks_to_start: 2
+    minimum_landmarks_to_start: 1
     log_root: ~/hw3_logs
     run_name: ""

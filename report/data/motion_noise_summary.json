@@ -24,6 +24,6 @@
     "right_turn_increment_rad": 0.02261615748165217,
     "turn_tolerance_rad": 0.03490658503988659,
     "max_blind_turn_pulses": 5,
-    "minimum_landmarks_to_start": 2
+    "minimum_landmarks_to_start": 1
   }
 }

@@ -44,7 +44,7 @@ class HW3Controller(Node):
         self.declare_parameter("observation_timeout_s", 6.0)
         self.declare_parameter("max_blind_turn_pulses", 30)
         self.declare_parameter("start_delay_s", 3.0)
-        self.declare_parameter("minimum_landmarks_to_start", 2)
+        self.declare_parameter("minimum_landmarks_to_start", 1)
         self.declare_parameter("log_root", "~/hw3_logs")
         self.declare_parameter("run_name", "")
 

@@ -385,10 +385,11 @@ tag visibility, and comparability with the square trajectory.
 
 The controller stops when a completed primitive is not followed by a fresh
 accepted observation before the timeout. After translation it remains stopped;
-blind translation is disabled. It also requires at least two initialized
-landmarks before starting. Direction-specific mean turn increments are used only
-for prediction; after every 0.10 s pulse, a fresh landmark update determines
-whether another pulse is needed. If zero tags are observed mid-turn, at most five
+blind translation is disabled. It may start from one initialized landmark
+because the arena does not guarantee two tags at every start pose. This weakens
+initial yaw observability, so direction-specific mean turn increments are used
+only for prediction and every 0.10 s pulse requires a fresh landmark update to
+determine whether another pulse is needed. If zero tags are observed mid-turn, at most five
 micro-pulses continue toward the already selected target, with a stop/check after
 each. Any accepted old or new landmark immediately restores closed-loop control;
 five failures cause a permanent safe hold. TODO[RESULT]: Describe the recovery

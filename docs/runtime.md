@@ -221,7 +221,10 @@ results.
 
 ## Expected behavior
 
-- The controller does not move until at least two tags have initialized the map.
+- The controller may start after one tag initializes the map because two tags
+  are not guaranteed at every valid arena start. Initial yaw is consequently
+  weakly constrained; motion stays conservative and additional landmarks are
+  added dynamically as they enter view.
 - The unchanged motor command is predicted from calibration: a nominal 5 cm
   timing command produced 6.83 cm mean motion, with landmark correction after
   every primitive.
