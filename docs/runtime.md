@@ -12,6 +12,38 @@ colcon build --symlink-install
 source ~/ros2_ws/install/setup.bash
 ```
 
+### If the build asks for `robot_teleop_launch.py`
+
+That filename exists only in the old HW2 `setup.py`. First verify the rover
+source instead of repeatedly rebuilding stale metadata:
+
+```bash
+cd ~/ros2_ws/src/rubikpi_ros2
+git status --short --branch
+git log -1 --oneline
+grep -n 'robot_teleop_launch' robot_control/setup.py
+```
+
+With the HW3 source, the `grep` command prints nothing and `setup.py` contains
+`glob('launch/*.py')`. Update the source, then remove only the stale
+`robot_control` build/install products:
+
+```bash
+cd ~/ros2_ws/src/rubikpi_ros2
+git fetch origin
+git checkout main
+git pull --ff-only
+
+cd ~/ros2_ws
+rm -rf build/robot_control install/robot_control
+colcon build --symlink-install --allow-overriding apriltag_ros
+source ~/ros2_ws/install/setup.bash
+```
+
+The `apriltag_ros` override warning is expected because this workspace carries
+the course-compatible detector configuration over the Jazzy underlay package.
+The missing launch-file error is not caused by that warning.
+
 The package now installs working entry points for `motor_control`,
 `velocity_mapping`, `hw3_slam`, and `hw3_controller`; direct `python3` paths are
 no longer required.

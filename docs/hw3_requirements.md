@@ -8,7 +8,7 @@ being missed. Check a box only after evidence has been collected.
 
 - [ ] Use a square environment near 10 ft by 10 ft and no smaller than 8 ft by
   8 ft.
-- [ ] Place two landmarks on each of the four sides.
+- [x] Place two landmarks on each of the four sides.
 - [ ] Record tag IDs, tag-center coordinates, height, and wall dimensions.
 - [ ] Provide a measured top-down ground-truth sketch in the report.
 - [ ] Record the robot's measured start pose for the offline SLAM-to-world

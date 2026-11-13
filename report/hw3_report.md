@@ -50,22 +50,22 @@ tag has a measured detection-edge size of 0.154 m. Unique IDs make data
 association deterministic while the EKF still discovers landmarks dynamically;
 the state is not preallocated with eight landmarks.
 
-The planned placement uses equal tag height and approximately one-third/two-
-thirds wall spacing. This avoids corner occlusion, spreads observations along
-each path edge, and makes it likely that a tag enters the forward camera field
-of view before and after a turn. The exact placement is finalized only after a
-range and viewing-angle test.
+The tags are mounted at approximately one-third/two-thirds wall spacing, upright
+at the wall plane and facing inward. IDs increase counterclockwise from the
+right/east tag on the north wall. Tags 4 and 5 have center height 0.124 m; all
+others have center height 0.210 m. The unequal height is retained as a measured
+property and will be checked during the visibility survey.
 
 | Tag ID | Wall | World x (m) | World y (m) | Center height (m) | Face direction | Notes |
 |---:|---|---:|---:|---:|---|---|
-| TODO | South | TODO | TODO | TODO | inward | TODO[ARENA] |
-| TODO | South | TODO | TODO | TODO | inward | TODO[ARENA] |
-| TODO | East | TODO | TODO | TODO | inward | TODO[ARENA] |
-| TODO | East | TODO | TODO | TODO | inward | TODO[ARENA] |
-| TODO | North | TODO | TODO | TODO | inward | TODO[ARENA] |
-| TODO | North | TODO | TODO | TODO | inward | TODO[ARENA] |
-| TODO | West | TODO | TODO | TODO | inward | TODO[ARENA] |
-| TODO | West | TODO | TODO | TODO | inward | TODO[ARENA] |
+| 0 | North, east/right | TODO[ARENA] | TODO[ARENA] | 0.210 | inward (`-y`) | Mounted |
+| 1 | North, west/left | TODO[ARENA] | TODO[ARENA] | 0.210 | inward (`-y`) | Mounted |
+| 2 | West, north/upper | TODO[ARENA] | TODO[ARENA] | 0.210 | inward (`+x`) | Mounted |
+| 3 | West, south/lower | TODO[ARENA] | TODO[ARENA] | 0.210 | inward (`+x`) | Mounted |
+| 4 | South, west/left | TODO[ARENA] | TODO[ARENA] | 0.124 | inward (`+y`) | Mounted |
+| 5 | South, east/right | TODO[ARENA] | TODO[ARENA] | 0.124 | inward (`+y`) | Mounted |
+| 6 | East, south/lower | TODO[ARENA] | TODO[ARENA] | 0.210 | inward (`-x`) | Mounted |
+| 7 | East, north/upper | TODO[ARENA] | TODO[ARENA] | 0.210 | inward (`-x`) | Mounted |
 
 TODO[ARENA]: Add the top-down ground-truth map with wall dimensions, tag IDs,
 tag centers, path start, world axes, square path, and octagon path.
@@ -290,15 +290,19 @@ blur, and safer behavior with unreliable open-loop motion.
 
 ### 4.2 Square trajectory and choice of \(n\)
 
-TODO[ARENA]: Select the square side length \(n\) after testing tag range,
-corner visibility, rover clearance, and usable floor area. Explain the selected
-value and compare visibility against accumulated motion uncertainty.
+The initial survey path uses \(n=1.8\) m, centered in the nominal 3.302 m
+arena. Its proposed vertices are `(0.751,0.751)`, `(2.551,0.751)`,
+`(2.551,2.551)`, and `(0.751,2.551)` m. TODO[ARENA]: Confirm or revise \(n\)
+after testing tag range, corner visibility, rover clearance, and usable floor
+area. Explain the final selection against accumulated motion uncertainty.
 
 ### 4.3 Eight-edge octagon and choice of \(m\)
 
-TODO[ARENA]: Select the regular-octagon side length \(m\). Explain the tradeoff
-between 45-degree turn error, arena coverage, tag visibility, and comparability
-with the square trajectory.
+The initial survey path uses \(m=0.75\) m, producing a centered footprint about
+1.811 m square. Its eight nominal vertices are documented in
+`docs/arena_setup.md`. TODO[ARENA]: Confirm or revise \(m\) after the visibility
+survey and explain the tradeoff between 45-degree turn error, arena coverage,
+tag visibility, and comparability with the square trajectory.
 
 ### 4.4 No-fresh-observation behavior
 

@@ -13,24 +13,28 @@ number with a tape-measured tag-center coordinate after mounting.
 
 ## Recommended placement
 
-Use IDs 0 through 7 in counterclockwise wall order. Put two tags on each wall at
-about one-third and two-thirds of the measured wall length. Mount every tag
-upright, flat, and facing inward. A common center height near 0.20 m is a useful
-starting point: the camera origin is about 0.115 m high and a 0.154 m tag centered
-at 0.20 m has its lower edge near camera height.
+The mounted IDs run counterclockwise starting on the north wall: tag 0 is the
+right/east tag, tag 1 is the left/west tag, tags 2 and 3 are the north and south
+tags on the west wall, tags 4 and 5 continue across the south wall, and tags 6
+and 7 continue up the east wall. All tags are upright, at the wall plane, and
+face inward. Tags 4 and 5 have measured center height 0.124 m; the other tags
+have measured center height 0.210 m.
 
 For a nominal 3.302 m square, one-third is 1.101 m and two-thirds is 2.201 m:
 
-| ID | Wall | Proposed tag center (m) | Inward face normal |
-|---:|---|---|---|
-| 0 | South | `(1.101, 0.000, 0.200)` | `+y` |
-| 1 | South | `(2.201, 0.000, 0.200)` | `+y` |
-| 2 | East | `(3.302, 1.101, 0.200)` | `-x` |
-| 3 | East | `(3.302, 2.201, 0.200)` | `-x` |
-| 4 | North | `(2.201, 3.302, 0.200)` | `-y` |
-| 5 | North | `(1.101, 3.302, 0.200)` | `-y` |
-| 6 | West | `(0.000, 2.201, 0.200)` | `+x` |
-| 7 | West | `(0.000, 1.101, 0.200)` | `+x` |
+| ID | Wall/location | Nominal center (m) | Measured height | Inward normal |
+|---:|---|---|---:|---|
+| 0 | North, east/right | `(2.201, 3.302)` | 0.210 m | `-y` |
+| 1 | North, west/left | `(1.101, 3.302)` | 0.210 m | `-y` |
+| 2 | West, north/upper | `(0.000, 2.201)` | 0.210 m | `+x` |
+| 3 | West, south/lower | `(0.000, 1.101)` | 0.210 m | `+x` |
+| 4 | South, west/left | `(1.101, 0.000)` | 0.124 m | `+y` |
+| 5 | South, east/right | `(2.201, 0.000)` | 0.124 m | `+y` |
+| 6 | East, south/lower | `(3.302, 1.101)` | 0.210 m | `-x` |
+| 7 | East, north/upper | `(3.302, 2.201)` | 0.210 m | `-x` |
+
+The x/y values remain nominal until the mounted centers and four wall lengths
+are tape-measured. Do not use them for final landmark-error calculations yet.
 
 This spacing keeps tags away from corner occlusion and distributes observations
 along each wall. When the rover drives a wall-aligned square, its forward camera
@@ -63,9 +67,39 @@ Start with a conservative square side near 1.8 m, centered in the room, and an
 octagon that fits within a similar footprint. These are test values, not final
 report values. Increase them only after confirming clearance and tag visibility.
 
-With the nominal 3.302 m room and the controller's local-path convention, a
-centered 1.8 m square starts near world pose `(0.751, 0.751, 0)`. The proposed
-0.75 m octagon spans approximately 1.811 m by 1.811 m; a centered placement
-starts near `(1.276, 0.746, 0)` because the later octagon vertices extend about
-0.530 m to the left of its initial local-frame x coordinate. Mark and measure
-these poses rather than relying on the nominal calculations.
+## Floor marks for the initial paths
+
+Mark the `base_link` center at each vertex, not the front bumper or camera. The
+coordinates below use the nominal 3.302 m square, the southwest origin, and a
+starting yaw of 0 radians (east). Recompute them from the measured east-west
+width `W` and north-south height `H` if either differs materially from 3.302 m.
+
+For the centered 1.8 m square, use
+`x_low=(W-1.8)/2`, `x_high=x_low+1.8`, and the corresponding y values. Nominal
+marks, visited counterclockwise, are:
+
+| Mark | World coordinate (m) | Departing direction |
+|---|---|---|
+| S0 | `(0.751, 0.751)` | east; robot start |
+| S1 | `(2.551, 0.751)` | north |
+| S2 | `(2.551, 2.551)` | west |
+| S3 | `(0.751, 2.551)` | south, then return to S0 |
+
+For the centered regular octagon with side length 0.75 m, the footprint is
+`0.75(1+sqrt(2)) = 1.811 m` square. Nominal marks are:
+
+| Mark | World coordinate (m) | Departing direction |
+|---|---|---|
+| O0 | `(1.2760, 0.7457)` | east; robot start |
+| O1 | `(2.0260, 0.7457)` | northeast, 45 degrees |
+| O2 | `(2.5563, 1.2760)` | north, 90 degrees |
+| O3 | `(2.5563, 2.0260)` | northwest, 135 degrees |
+| O4 | `(2.0260, 2.5563)` | west, 180 degrees |
+| O5 | `(1.2760, 2.5563)` | southwest, -135 degrees |
+| O6 | `(0.7457, 2.0260)` | south, -90 degrees |
+| O7 | `(0.7457, 1.2760)` | southeast, -45 degrees, then O0 |
+
+These 4 square marks plus 8 octagon marks are the 12 important vertices. Mark
+S0/O0 separately even if you later decide to share a start region. Record the
+actual measured mark coordinates and start yaws for the report rather than
+silently treating these nominal calculations as measurements.

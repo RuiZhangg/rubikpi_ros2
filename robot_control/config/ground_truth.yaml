@@ -11,14 +11,16 @@ world_frame:
   description: origin at the measured southwest arena corner, x east, y north
   robot_start_pose: [null, null, null]
 
-# Fill exact tag-center coordinates after mounting. Suggested ID/wall assignment
-# is documented in docs/arena_setup.md.
+# Tags are mounted at the nominal one-third/two-thirds locations. The measured
+# heights and ID/wall assignment are recorded below. Keep x/y null until the
+# mounted tag centers and all four wall lengths are tape-measured; the analysis
+# tool treats non-null x/y as final ground truth.
 tags:
-  0: {wall: south, x: null, y: null, z: null}
-  1: {wall: south, x: null, y: null, z: null}
-  2: {wall: east, x: null, y: null, z: null}
-  3: {wall: east, x: null, y: null, z: null}
-  4: {wall: north, x: null, y: null, z: null}
-  5: {wall: north, x: null, y: null, z: null}
-  6: {wall: west, x: null, y: null, z: null}
-  7: {wall: west, x: null, y: null, z: null}
+  0: {wall: north, x: null, y: null, z: 0.210, nominal_x: 2.201, nominal_y: 3.302, face_yaw: -1.5707963268}
+  1: {wall: north, x: null, y: null, z: 0.210, nominal_x: 1.101, nominal_y: 3.302, face_yaw: -1.5707963268}
+  2: {wall: west, x: null, y: null, z: 0.210, nominal_x: 0.000, nominal_y: 2.201, face_yaw: 0.0}
+  3: {wall: west, x: null, y: null, z: 0.210, nominal_x: 0.000, nominal_y: 1.101, face_yaw: 0.0}
+  4: {wall: south, x: null, y: null, z: 0.124, nominal_x: 1.101, nominal_y: 0.000, face_yaw: 1.5707963268}
+  5: {wall: south, x: null, y: null, z: 0.124, nominal_x: 2.201, nominal_y: 0.000, face_yaw: 1.5707963268}
+  6: {wall: east, x: null, y: null, z: 0.210, nominal_x: 3.302, nominal_y: 1.101, face_yaw: 3.1415926536}
+  7: {wall: east, x: null, y: null, z: 0.210, nominal_x: 3.302, nominal_y: 2.201, face_yaw: 3.1415926536}
