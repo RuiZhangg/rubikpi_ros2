@@ -1,1 +1,30 @@
 *.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ROS 2 / colcon
+build/
+install/
+log/
+
+# Editors and local environments
+.idea/
+.vscode/
+.venv/
+venv/
+
+# Runtime output. Keep curated report inputs under report/data/ instead.
+hw3_logs/
+runtime/logs/
+*.bag
+*.bag.active
+rosbag2_*/
+
+# Generated report artifacts
+report/figures/generated/
+report/output/
