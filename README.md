@@ -13,7 +13,7 @@ active branch is intentionally organized around HW3 only.
 - `robot_vision/`: Rubik Pi camera driver and calibrated camera parameters.
 - `apriltag_ros/`: AprilTag detector used for landmark observations.
 - `robot_control/`: motor bridge, EKF-SLAM, experiment controller, launch, and
-  configuration.
+  configuration, including a supervised one-primitive calibration command.
 - `tools/`: offline validation, plotting, and landmark-error analysis.
 - `report/`: report source, experiment-data instructions, and figures.
 - `docs/`: requirement traceability, arena setup, and runtime instructions.

@@ -38,6 +38,7 @@ setup(
             'velocity_mapping = robot_control.velocity_mapping:main',
             'hw3_slam = robot_control.hw3_slam_node:main',
             'hw3_controller = robot_control.hw3_controller:main',
+            'motion_calibration = robot_control.motion_calibration:main',
         ],
     },
 )

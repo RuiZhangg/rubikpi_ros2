@@ -104,6 +104,34 @@ Use the sample covariance or a slightly conservative diagonal approximation for
 the control-noise model. Report both the measurements and the final values;
 do not present preliminary config values as calibrated results.
 
+Build the current source on the rover, then run only the motor bridge and
+velocity mapper in two terminals:
+
+```bash
+ros2 run robot_control motor_control
+```
+
+```bash
+ros2 run robot_control velocity_mapping
+```
+
+From a third sourced terminal, execute exactly one supervised primitive. The
+command waits three seconds, moves once, publishes zero commands while settling,
+and exits:
+
+```bash
+ros2 run robot_control motion_calibration straight --trial-id straight_01
+ros2 run robot_control motion_calibration left --trial-id left_01
+ros2 run robot_control motion_calibration right --trial-id right_01
+```
+
+Reset the rover to the same measured `base_link` center and heading before each
+invocation. Do not run full HW3 bringup concurrently. Record actual translation
+and yaw in `motion_trials.csv`. For small turn pulses, extend the chassis heading
+with a one-meter straightedge or laser reference: a 3-degree rotation produces
+about 52 mm lateral displacement at one meter and is much easier to measure than
+reading a small protractor at the rover.
+
 ## Required sanity checks after tuning
 
 - Prediction covariance grows during unobserved motion.
