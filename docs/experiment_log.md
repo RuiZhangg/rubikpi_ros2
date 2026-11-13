@@ -114,6 +114,22 @@ directional and trial-to-trial turn variation.
 The motor commands remain unchanged. The closed-loop controller now predicts
 translation with scale 1.3659, predicts left and right pulses separately, uses a
 2-degree heading tolerance, requires two initialized landmarks before starting,
-and disables all blind turn pulses. Existing conservative process noise is kept
-because it exceeds the measured motion scatter and lets landmark observations
-correct each stopped primitive.
+and permits only a bounded five-pulse zero-tag search during an existing turn.
+Existing conservative process noise is kept because it exceeds the measured
+motion scatter and lets landmark observations correct each stopped primitive.
+
+## 2026-11-13 - 0.4 m square shakedown
+
+The interrupted shakedown ran for about 194 seconds, reached three waypoints,
+mapped seven tags, and accepted 300 of 301 observations. At the apparent stall,
+the controller was turning at the fourth vertex to face the final edge. It was
+still receiving and accepting tag 3 after nearly every pulse; the two-landmark
+startup gate was not involved. The behavior looked stalled because calibrated
+left pulses average only about 1.16 degrees, so a 90-degree corner requires many
+stop-observe cycles. Turn-progress logging was added.
+
+The runtime recovery policy is now explicit: one visible mapped landmark may
+update the correlated EKF after startup; zero-tag translation causes an
+indefinite hold; zero tags mid-turn permit at most five micro-search pulses
+toward the existing target, with a stop/check after every pulse, followed by an
+indefinite hold. No blind translation is permitted.

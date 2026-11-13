@@ -254,7 +254,8 @@ motions remain highly variable, the deliberately conservative control-noise
 standard deviations remain
 `sigma_d=0.015+0.15|delta_s|` m and
 `sigma_theta=0.04+0.25|delta_theta|` rad. These exceed the measured scatter and
-allow fresh landmark updates to dominate. Blind turn pulses are disabled.
+allow fresh landmark updates to dominate. Blind translation is disabled; a
+zero-tag turn search is bounded to five micro-pulses with a stop after each.
 
 ### 3.8 Measurement noise \(R\)
 
@@ -384,11 +385,14 @@ tag visibility, and comparability with the square trajectory.
 
 The controller stops when a completed primitive is not followed by a fresh
 accepted observation before the timeout. After translation it remains stopped;
-blind translation and blind turn pulses are disabled. It also requires at least
-two initialized landmarks before starting. Direction-specific mean turn
-increments are used only for prediction; after every 0.10 s pulse, a fresh
-landmark update determines whether another pulse is needed. TODO[RESULT]:
-Describe the recovery behavior actually exercised in the final arena run.
+blind translation is disabled. It also requires at least two initialized
+landmarks before starting. Direction-specific mean turn increments are used only
+for prediction; after every 0.10 s pulse, a fresh landmark update determines
+whether another pulse is needed. If zero tags are observed mid-turn, at most five
+micro-pulses continue toward the already selected target, with a stop/check after
+each. Any accepted old or new landmark immediately restores closed-loop control;
+five failures cause a permanent safe hold. TODO[RESULT]: Describe the recovery
+behavior actually exercised in the final arena run.
 
 ## 5. Results
 

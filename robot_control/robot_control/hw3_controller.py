@@ -231,6 +231,17 @@ class HW3Controller(Node):
                 self.mode = "decide"
                 self.blind_turn_pulses = 0
                 self._record_event("fresh_observation")
+                if (
+                    abs(self.pending_delta_yaw) > 0.0
+                    and self.turn_target_yaw is not None
+                ):
+                    remaining = wrap_angle(self.turn_target_yaw - self.pose[2])
+                    self.get_logger().info(
+                        "Landmark update accepted during turn: "
+                        f"yaw={math.degrees(self.pose[2]):.1f} deg, "
+                        f"target={math.degrees(self.turn_target_yaw):.1f} deg, "
+                        f"remaining={math.degrees(remaining):.1f} deg."
+                    )
             elif now > self.wait_deadline:
                 if (
                     abs(self.pending_delta_yaw) > 0.0

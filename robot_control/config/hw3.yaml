@@ -44,7 +44,9 @@ hw3_controller:
 
     waypoint_tolerance_m: 0.07
     observation_timeout_s: 8.0
-    max_blind_turn_pulses: 0
+    # If all tags disappear mid-turn, search at most five tiny pulses toward the
+    # existing target, stopping after each. Translation is never blind.
+    max_blind_turn_pulses: 5
     start_delay_s: 3.0
     minimum_landmarks_to_start: 2
     log_root: ~/hw3_logs

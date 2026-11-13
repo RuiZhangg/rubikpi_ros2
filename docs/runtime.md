@@ -228,8 +228,11 @@ results.
 - Turns use the successful HW2 settings: angular command 0.002 for 0.10 s, with
   measured predictions of about +1.16 degrees left and -1.30 degrees right.
 - After every primitive the rover stops and waits for a new accepted tag update.
-- Blind translation and blind turn pulses are disabled. If no accepted landmark
-  update arrives, the rover remains stopped indefinitely.
+- Blind translation is disabled. If all tags disappear during an intended turn,
+  the rover may issue at most five calibrated micro-pulses toward the existing
+  target, stopping and checking after each. It immediately resumes closed-loop
+  correction when any mapped or new tag is accepted; after five unsuccessful
+  pulses it remains stopped indefinitely.
 - Logs are written under `~/hw3_logs/<run_name>/`.
 
 ## Recommended staged tests
