@@ -235,6 +235,15 @@ pixels and produced larger HW2 pose errors.
 TODO[CALIBRATION]: Report sample counts, tested ranges/angles, covariance, and
 the final range-dependent model.
 
+A preliminary stationary checkpoint placed tag 0 nearly front-on at an observed
+range of approximately 0.934 m. Detections had hamming distance 0 and decision
+margin approximately 175. The first observation initialized the landmark and
+the subsequent inspected observations were accepted; their NIS values were far
+below the 9.21 gate. Robot-frame measurements remained near 0.907 m forward and
+-0.0363 m left. This demonstrates short-range repeatability and validates the
+TF direction, but it does not measure absolute bias or performance at long range
+and oblique views. Therefore it is not used alone to reduce `R`.
+
 ### 3.9 First observation of a new landmark
 
 For a new ID, the landmark is initialized by transforming its robot-frame

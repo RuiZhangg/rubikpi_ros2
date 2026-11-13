@@ -33,6 +33,24 @@ sigma(range) = measurement_sigma_base_m
 that is at least as large as the observed spread across the tested ranges. Keep
 the raw CSVs and fit plot as report evidence.
 
+For the mounted tag 0, use this initial calibration matrix. Restart bringup after
+every manual relocation and keep the controller disabled:
+
+| Run name | Approximate base-link/tag range | Robot yaw relative to front-on |
+|---|---:|---:|
+| `r_tag0_d075_a00_01` | 0.75 m | 0 degrees |
+| `r_tag0_d150_a00_01` | 1.50 m | 0 degrees |
+| `r_tag0_d225_a00_01` | 2.25 m | 0 degrees |
+| `r_tag0_d150_ap30_01` | 1.50 m | +30 degrees |
+| `r_tag0_d150_am30_01` | 1.50 m | -30 degrees |
+| `r_tag0_d150_ap45_01` | 1.50 m | +45 degrees |
+| `r_tag0_d150_am45_01` | 1.50 m | -45 degrees |
+
+The completed `stationary_tag0_01` run near 0.934 m supplies an additional
+front-on checkpoint. Collect at least 60 seconds and 30 accepted observations
+per run. Measure range from the `base_link` origin, record how yaw was measured,
+and do not infer absolute accuracy from within-run scatter alone.
+
 ## Motion noise M (mapped to Q through G)
 
 Use `report/data/motion_trials_template.csv` as the schema. For translation,

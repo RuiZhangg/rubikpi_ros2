@@ -80,6 +80,26 @@ start-pose mark is useful because the measured start pose is needed for the
 offline world-frame transform. The remaining coordinates below are optional
 human references for repeatability and independent path-error checks.
 
+### Minimal recommended start marks
+
+Use two composite tape marks if the square and octagon remain centered: one for
+each trajectory. Each composite mark is a cross under the `base_link` origin
+plus a 0.30 m straight heading line pointing east. Equivalently, four small dots
+can be used: a center and forward alignment point for each path.
+
+For measured arena width `W`, height `H`, square side `n`, and octagon side `m`:
+
+- Square center mark: `S-C=((W-n)/2, (H-n)/2)`.
+- Square forward point: `S-F=S-C+(0.30, 0)`.
+- Let `B=m(1+sqrt(2))` be the octagon footprint.
+- Octagon center mark: `O-C=(W/2-m/2, (H-B)/2)`.
+- Octagon forward point: `O-F=O-C+(0.30, 0)`.
+
+With the nominal `W=H=3.302 m`, `n=1.8 m`, and `m=0.75 m`, these are
+`S-C=(0.751,0.751)`, `S-F=(1.051,0.751)`, `O-C=(1.276,0.746)`, and
+`O-F=(1.576,0.746)` m. Recompute them from the measured wall dimensions before
+placing permanent references.
+
 If optional references are used, mark the `base_link` center, not the front
 bumper or camera. The
 coordinates below use the nominal 3.302 m square, the southwest origin, and a
