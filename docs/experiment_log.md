@@ -74,3 +74,22 @@ was rejected as overconfident.
 The configured measurement model is now `sigma(r)=0.010+0.005r` m. Exact
 ground-truth map error will still capture systematic bias that cannot be inferred
 from within-run scatter.
+
+## 2026-11-13 - landmark-based motion pilot
+
+Three single-primitive trials used tags 0 and 1, with 20 samples per tag before
+and after motion and approximately 1.128 m landmark baseline.
+
+| Trial | Command | Estimated motion | Yaw estimate | Fit RMSE | Bootstrap yaw std. |
+|---|---|---|---|---:|---:|
+| `straight_01` | 0.050 m | 0.05165 m forward, 0.00220 m left | -0.472 deg | 0.00219 m | 0.308 deg |
+| `left_01` | +3.000 deg | -0.00103 m forward, -0.00093 m left | +1.549 deg | 0.00031 m | 0.051 deg |
+| `right_01` | -3.000 deg | +0.00028 m forward, +0.00145 m left | -2.583 deg | 0.00003 m | 0.013 deg |
+
+All signs and geometry checks passed. The rover traveled about 3.3% farther
+than commanded in the straight pilot. More importantly, the same 0.10 s pulse
+produced only about 52% of the nominal left increment but 86% of the nominal
+right increment. No controller value is changed from one trial; collect 20
+trials per primitive and calibrate left/right prediction separately. Collection
+defaults were raised to 30 samples per tag and 5 seconds to reduce the borderline
+straight yaw uncertainty.

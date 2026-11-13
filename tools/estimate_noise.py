@@ -17,8 +17,9 @@ def read_numeric_rows(path):
 
 def estimate_motion(path):
     rows = read_numeric_rows(path)
-    errors = []
+    groups = {}
     for row in rows:
+        kind = row.get("kind", "all").strip() or "all"
         distance_error = float(row["actual_distance_m"]) - float(
             row["commanded_distance_m"]
         )
@@ -32,15 +33,60 @@ def estimate_motion(path):
                 - float(row["commanded_delta_yaw_rad"])
             ),
         )
-        errors.append([distance_error, yaw_error])
-    if len(errors) < 2:
-        raise ValueError("motion calibration requires at least two trials")
-    errors = np.asarray(errors, dtype=float)
+        entry = groups.setdefault(
+            kind,
+            {
+                "actual": [],
+                "commanded": [],
+                "errors": [],
+                "measurement_std": [],
+            },
+        )
+        entry["actual"].append(
+            [float(row["actual_distance_m"]), float(row["actual_delta_yaw_rad"])]
+        )
+        entry["commanded"].append(
+            [
+                float(row["commanded_distance_m"]),
+                float(row["commanded_delta_yaw_rad"]),
+            ]
+        )
+        entry["errors"].append([distance_error, yaw_error])
+        if row.get("forward_std_m") and row.get("yaw_std_rad"):
+            entry["measurement_std"].append(
+                [float(row["forward_std_m"]), float(row["yaw_std_rad"])]
+            )
+
+    if not groups:
+        raise ValueError("motion calibration requires at least one trial")
+    summaries = {}
+    for kind, entry in sorted(groups.items()):
+        actual = np.asarray(entry["actual"], dtype=float)
+        commanded = np.asarray(entry["commanded"], dtype=float)
+        errors = np.asarray(entry["errors"], dtype=float)
+        summary = {
+            "trial_count": int(len(errors)),
+            "mean_commanded": np.mean(commanded, axis=0).tolist(),
+            "mean_actual": np.mean(actual, axis=0).tolist(),
+            "mean_error": np.mean(errors, axis=0).tolist(),
+            "sample_covariance": None,
+            "sample_standard_deviation": None,
+        }
+        if len(errors) >= 2:
+            summary["sample_covariance"] = np.cov(
+                errors, rowvar=False, ddof=1
+            ).tolist()
+            summary["sample_standard_deviation"] = np.std(
+                errors, axis=0, ddof=1
+            ).tolist()
+        if entry["measurement_std"]:
+            summary["mean_estimator_standard_deviation"] = np.mean(
+                np.asarray(entry["measurement_std"], dtype=float), axis=0
+            ).tolist()
+        summaries[kind] = summary
     return {
-        "trial_count": int(len(errors)),
-        "mean_error": np.mean(errors, axis=0).tolist(),
-        "sample_covariance": np.cov(errors, rowvar=False, ddof=1).tolist(),
-        "sample_standard_deviation": np.std(errors, axis=0, ddof=1).tolist(),
+        "trial_count": int(len(rows)),
+        "group_summaries": summaries,
     }
 
 

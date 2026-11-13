@@ -98,6 +98,9 @@ Summarize the trials with:
 python3 tools/estimate_noise.py motion report/data/motion_trials.csv
 ```
 
+The output reports separate `straight`, `left`, and `right` groups. Do not pool
+them: the pilot already showed materially different left/right response.
+
 Use the mean error to decide whether the command calibration needs correction.
 Use the sample covariance or a slightly conservative diagonal approximation for
 the control-noise model. Report both the measurements and the final values;
@@ -132,7 +135,7 @@ Return the rover approximately to the same clear, tag-visible area before each
 invocation; exact manual placement is unnecessary because every trial uses its
 own before/after measurements. Do not run another motor controller or
 autonomous controller concurrently. The command refuses to move if it cannot
-collect at least 10 samples from each of two tags within 30 seconds. After
+collect at least 30 samples from each of two tags within 30 seconds. After
 motion it repeats the check, estimates forward/left displacement and yaw,
 prints JSON with bootstrap standard deviations and fit residuals, and appends:
 
@@ -144,6 +147,15 @@ Use a different `--trial-id` every time. Treat a trial as invalid if it exits
 with status 2, if fit RMSE is unexpectedly large, or if bootstrap yaw uncertainty
 is comparable to the measured turn. Manual tape/heading measurements are now
 optional spot checks rather than the primary data source.
+
+The first three pilot trials passed the geometry and fit checks. The straight
+primitive traveled 0.05165 m and showed -0.472 degrees yaw; the left pulse
+produced +1.549 degrees and the right pulse -2.583 degrees. Fit RMSE was at most
+0.00219 m and the common-tag baseline was about 1.128 m. The directional turn
+asymmetry must be estimated from repeated groups rather than pooled with straight
+trials. Defaults were increased from 10 to 30 samples per tag and from 3 to 5
+seconds of collection after the pilot because straight-trial yaw uncertainty was
+0.308 degrees.
 
 As a no-motion validation, four existing stationary two-tag logs were divided
 into early and late windows and passed through the same estimator. Apparent

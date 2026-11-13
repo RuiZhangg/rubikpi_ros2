@@ -235,6 +235,13 @@ degrees. This is sufficiently below the commanded 50 mm and approximately
 3-degree primitives to replace manual measurement as the primary calibration
 method.
 
+In the first pilot, a nominal 0.050 m straight primitive produced 0.05165 m
+forward motion and -0.472 degrees yaw. Nominal +3-degree and -3-degree pulses
+produced +1.549 and -2.583 degrees, respectively. All fits used tags 0 and 1
+with approximately 1.128 m baseline and at most 0.00219 m fit RMSE. The strong
+directional asymmetry motivates separate left/right calibration; final process
+noise values require the repeated trials.
+
 TODO[CALIBRATION]: Report trial count, raw-error plots, sample covariance, and
 the final numerical values used.
 
@@ -336,7 +343,7 @@ cross-covariance, stationary landmark prediction, outlier rejection, covariance
 symmetry/positive semidefiniteness, square/octagon closure, measurement-noise
 replay, landmark rigid-motion recovery and geometry rejection, and a synthetic
 square loop with biased motion. At the landmark-motion implementation checkpoint,
-all 15 offline tests passed with Python warnings treated as errors. TODO[RESULT]:
+all 16 offline tests passed with Python warnings treated as errors. TODO[RESULT]:
 Replace this count with the final submission-commit test result if it changes.
 
 ## 4. Closed-loop trajectory strategy
