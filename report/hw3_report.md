@@ -85,6 +85,12 @@ only, the measured initial world pose
 \((x_{w0},y_{w0},\theta_{w0})\) is used to transform estimated robot and
 landmark positions into the world frame.
 
+A physical start-position and yaw reference is used only to repeat trials and
+measure that offline transform. The rover does not observe floor marks, and no
+measured path-vertex coordinates or landmark ground truth are supplied to the
+online estimator or controller. Square and octagon waypoint errors are corrected
+from the current EKF pose estimate.
+
 TODO[ARENA]: Record the physical start pose and explain how it was measured.
 
 ## 3. EKF-SLAM algorithm

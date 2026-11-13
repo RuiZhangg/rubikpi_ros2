@@ -13,6 +13,8 @@ being missed. Check a box only after evidence has been collected.
 - [ ] Provide a measured top-down ground-truth sketch in the report.
 - [ ] Record the robot's measured start pose for the offline SLAM-to-world
   transform. Do not provide this pose to the online filter.
+- [x] Keep all floor references evaluation-only; online navigation uses the
+  current SLAM pose rather than measured path vertices.
 
 ## Online algorithm
 

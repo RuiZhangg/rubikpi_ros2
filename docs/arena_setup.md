@@ -52,24 +52,36 @@ each approach and turn.
 4. Record tag ID, center x/y/z, wall, and face direction in
    `robot_control/config/ground_truth.yaml`.
 5. Photograph each wall and the tape-measure reference.
-6. Put removable floor marks at the robot start pose and intended path vertices.
-7. Record the start `base_link` center and yaw in the same world frame.
+6. Mark the robot's start `base_link` center and yaw for repeatable trials and
+   the required offline SLAM-to-world transform.
+7. Treat any other path-vertex marks as optional evaluation references. The
+   online controller and estimator must not observe or use them.
 
 ## Visibility survey before autonomous motion
 
 Carry or manually place the stationary rover at expected path vertices and edge
-midpoints. Record tag ID, range, decision margin, and detection rate while facing
-the next wall. Adjust tag height or along-wall position only if the survey shows
-a repeatable blind region. Any departure from roughly even spacing should be
+midpoints. Restart the SLAM process after every manual displacement, or perform
+this survey using detector/TF output without the EKF. Manual movement is not a
+control input and will otherwise cause valid measurements to fail the innovation
+gate. Record tag ID, range, decision margin, and detection rate while facing the
+next wall. Adjust tag height or along-wall position only if the survey shows a
+repeatable blind region. Any departure from roughly even spacing should be
 justified in the report as improving mapping/localization visibility.
 
 Start with a conservative square side near 1.8 m, centered in the room, and an
 octagon that fits within a similar footprint. These are test values, not final
 report values. Increase them only after confirming clearance and tag visibility.
 
-## Floor marks for the initial paths
+## Optional floor references for evaluation
 
-Mark the `base_link` center at each vertex, not the front bumper or camera. The
+The assignment does not require marked path vertices, and the rover must follow
+the square and octagon from its estimated SLAM pose rather than floor marks. A
+start-pose mark is useful because the measured start pose is needed for the
+offline world-frame transform. The remaining coordinates below are optional
+human references for repeatability and independent path-error checks.
+
+If optional references are used, mark the `base_link` center, not the front
+bumper or camera. The
 coordinates below use the nominal 3.302 m square, the southwest origin, and a
 starting yaw of 0 radians (east). Recompute them from the measured east-west
 width `W` and north-south height `H` if either differs materially from 3.302 m.
@@ -99,7 +111,7 @@ For the centered regular octagon with side length 0.75 m, the footprint is
 | O6 | `(0.7457, 2.0260)` | south, -90 degrees |
 | O7 | `(0.7457, 1.2760)` | southeast, -45 degrees, then O0 |
 
-These 4 square marks plus 8 octagon marks are the 12 important vertices. Mark
-S0/O0 separately even if you later decide to share a start region. Record the
-actual measured mark coordinates and start yaws for the report rather than
-silently treating these nominal calculations as measurements.
+These 4 square points plus 8 octagon points are optional evaluation locations,
+not online navigation inputs. Mark S0/O0 separately if both trials use different
+starts. Record any coordinates used for evaluation rather than silently treating
+these nominal calculations as measurements.
