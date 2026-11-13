@@ -218,9 +218,22 @@ TODO[CALIBRATION]: State the final numerical initial covariance and justify it.
 
 The rover has no encoders, its IMU is not trusted, the floor is low carpet, and
 turning is inconsistent. Motion uncertainty is therefore measured from repeated
-5 cm translations and repeated turn pulses on the actual arena carpet. The
-sample covariance of realized \([\Delta s,\Delta\theta]\) errors becomes
-\(M\), which is mapped into state space by \(G\).
+5 cm translations and repeated turn pulses on the actual arena carpet. For each
+trial, stationary tag centers are aggregated before and after motion. With at
+least two common IDs, the planar transform is fitted from
+\(z_i^{before}=R(\Delta\theta)z_i^{after}+t\). Thus \(t\) gives forward/lateral
+base motion and \(\Delta\theta\) gives yaw without using the unknown world map.
+Bootstrap resampling quantifies measurement uncertainty, while fit residual and
+landmark baseline expose poor geometry. The sample covariance of realized
+\([\Delta s,\Delta\theta]\) errors becomes \(M\), which is mapped into state
+space by \(G\).
+
+Splitting four stationary two-tag datasets into early and late windows provided
+a zero-motion check: apparent translation was 1.2-4.7 mm, apparent yaw was
+0.03-0.095 degrees, and bootstrap yaw standard deviation was at most 0.13
+degrees. This is sufficiently below the commanded 50 mm and approximately
+3-degree primitives to replace manual measurement as the primary calibration
+method.
 
 TODO[CALIBRATION]: Report trial count, raw-error plots, sample covariance, and
 the final numerical values used.
@@ -321,8 +334,9 @@ measurement functions and matched the analytic \(F\), \(G\), and \(H\)
 Jacobians. Tests also checked dynamic state augmentation, nonzero
 cross-covariance, stationary landmark prediction, outlier rejection, covariance
 symmetry/positive semidefiniteness, square/octagon closure, measurement-noise
-replay, and a synthetic square loop with biased motion. At the measurement-noise
-checkpoint, all 12 offline tests passed with Python warnings treated as errors. TODO[RESULT]:
+replay, landmark rigid-motion recovery and geometry rejection, and a synthetic
+square loop with biased motion. At the landmark-motion implementation checkpoint,
+all 15 offline tests passed with Python warnings treated as errors. TODO[RESULT]:
 Replace this count with the final submission-commit test result if it changes.
 
 ## 4. Closed-loop trajectory strategy

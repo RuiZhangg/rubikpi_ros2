@@ -87,11 +87,10 @@ python3 tools/replay_measurement_noise.py \
 
 ## Motion noise M (mapped to Q through G)
 
-Use `report/data/motion_trials_template.csv` as the schema. For translation,
-command one 5 cm primitive, measure the realized base-link displacement with
-floor marks, reset the rover, and repeat at least 15 times. For rotation, repeat
-the 0.10 s left and right pulses and measure yaw change with a large floor angle
-reference. Use the same battery state and carpet as the final experiment.
+Use `report/data/motion_trials_template.csv` as the minimum schema. For
+translation, command one 5 cm primitive, reset the rover, and repeat at least 15
+times. For rotation, repeat the 0.10 s left and right pulses. Use the same
+battery state and carpet as the final experiment.
 
 Summarize the trials with:
 
@@ -104,20 +103,24 @@ Use the sample covariance or a slightly conservative diagonal approximation for
 the control-noise model. Report both the measurements and the final values;
 do not present preliminary config values as calibrated results.
 
-Build the current source on the rover, then run only the motor bridge and
-velocity mapper in two terminals:
+The calibration command estimates motion from AprilTags rather than manual
+floor measurements. It requires at least two distinct tags visible both before
+and after motion. It robustly aggregates each tag center, fits the planar rigid
+transform from the after frame to the before frame, bootstraps uncertainty, and
+appends a CSV row compatible with `tools/estimate_noise.py motion`.
+
+Place the rover where at least two well-separated tags remain visible through a
+5 cm displacement and a small turn. Start perception, TF, and motor support
+without the SLAM node or autonomous controller:
 
 ```bash
-ros2 run robot_control motor_control
+ros2 launch robot_control hw3_bringup.launch.py \
+  run_slam:=false \
+  run_controller:=false \
+  run_name:=motion_calibration_support
 ```
 
-```bash
-ros2 run robot_control velocity_mapping
-```
-
-From a third sourced terminal, execute exactly one supervised primitive. The
-command waits three seconds, moves once, publishes zero commands while settling,
-and exits:
+From a second sourced terminal, execute exactly one supervised primitive:
 
 ```bash
 ros2 run robot_control motion_calibration straight --trial-id straight_01
@@ -125,12 +128,28 @@ ros2 run robot_control motion_calibration left --trial-id left_01
 ros2 run robot_control motion_calibration right --trial-id right_01
 ```
 
-Reset the rover to the same measured `base_link` center and heading before each
-invocation. Do not run full HW3 bringup concurrently. Record actual translation
-and yaw in `motion_trials.csv`. For small turn pulses, extend the chassis heading
-with a one-meter straightedge or laser reference: a 3-degree rotation produces
-about 52 mm lateral displacement at one meter and is much easier to measure than
-reading a small protractor at the rover.
+Return the rover approximately to the same clear, tag-visible area before each
+invocation; exact manual placement is unnecessary because every trial uses its
+own before/after measurements. Do not run another motor controller or
+autonomous controller concurrently. The command refuses to move if it cannot
+collect at least 10 samples from each of two tags within 30 seconds. After
+motion it repeats the check, estimates forward/left displacement and yaw,
+prints JSON with bootstrap standard deviations and fit residuals, and appends:
+
+```text
+~/hw3_logs/motion_calibration/landmark_motion_trials.csv
+```
+
+Use a different `--trial-id` every time. Treat a trial as invalid if it exits
+with status 2, if fit RMSE is unexpectedly large, or if bootstrap yaw uncertainty
+is comparable to the measured turn. Manual tape/heading measurements are now
+optional spot checks rather than the primary data source.
+
+As a no-motion validation, four existing stationary two-tag logs were divided
+into early and late windows and passed through the same estimator. Apparent
+translation was 1.2-4.7 mm and apparent yaw was 0.03-0.095 degrees; bootstrap
+yaw standard deviation was at most 0.13 degrees. This noise floor is well below
+the intended 50 mm translation and approximately 3-degree turn primitives.
 
 ## Required sanity checks after tuning
 

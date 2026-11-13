@@ -16,6 +16,7 @@ import yaml
 
 def generate_launch_description():
     run_controller = LaunchConfiguration("run_controller")
+    run_slam = LaunchConfiguration("run_slam")
     shape = LaunchConfiguration("shape")
     side_length_m = LaunchConfiguration("side_length_m")
     laps = LaunchConfiguration("laps")
@@ -46,6 +47,7 @@ def generate_launch_description():
 
     declarations = [
         DeclareLaunchArgument("run_controller", default_value="false"),
+        DeclareLaunchArgument("run_slam", default_value="true"),
         DeclareLaunchArgument("shape", default_value="square"),
         DeclareLaunchArgument("side_length_m", default_value="1.8"),
         DeclareLaunchArgument("laps", default_value="1"),
@@ -130,6 +132,7 @@ def generate_launch_description():
         executable="hw3_slam",
         name="hw3_slam_node",
         output="screen",
+        condition=IfCondition(run_slam),
         parameters=[hw3_config, {"run_name": run_name}],
     )
 
